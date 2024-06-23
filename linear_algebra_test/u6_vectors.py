@@ -248,6 +248,35 @@ class QuadraticFunction(Vector):
         return QuadraticFunction(0, 0, 0)
 
 
+class Polynomial(Vector):
+    """
+    实现类 Polynomial(Vector):
+    表示所有多项式的向量空间
+    """
+    def __init__(self, *coefficients):
+        self.coefficients = coefficients
+
+    def __call__(self, x):
+        return sum(coefficient * x ** power
+                   for (power, coefficient)
+                   in enumerate(self.coefficients))
+
+    def add(self, p):
+        return Polynomial([a + b
+                          for a, b
+                          in zip(self.coefficients,
+                                 p.coefficients)])
+
+    def scale(self, scalar):
+        return Polynomial([scalar * a
+                           for a in self.coefficients])
+        return "\$ %s \$" % (" + ".join(monomials))
+
+    @classmethod
+    def zero(cls):
+        return Polynomial(0)
+
+
 # Test functions and random vector generators
 def random_scalar():
     """使用random.uniform函数来生成−10和10之间均匀分布的浮点数"""
