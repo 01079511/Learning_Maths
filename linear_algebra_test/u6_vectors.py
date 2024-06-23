@@ -186,6 +186,13 @@ class CoordinateVector(Vector):
         return "{}{}".format(self.__class__.__qualname__, self.coordinates)
 
 
+class Vec6(CoordinateVector):
+    """定义具体维度"""
+    @property
+    def dimension(self):
+        return 6
+
+
 class LinearFunction(Vec2):
     """
     函数向量空间:f(x) = ax + b
@@ -201,6 +208,11 @@ class LinearFunction(Vec2):
         return LinearFunction(scalar * self.a, scalar * self.b)
 
     def __call__(self, input):
+        """
+        通过__call__方法实现LinearFunction类的实力能像函数一样被调用,测试在 u6_high_matrix中
+        :param input: 一个数值，用于计算线性函数的输出
+        :return: 返回输入input下的结果，即 f(input) = a * input + b
+        """
         return self.a * input + self.b
 
     @classmethod
@@ -208,11 +220,32 @@ class LinearFunction(Vec2):
         return LinearFunction(0, 0, 0)
 
 
-class Vec6(CoordinateVector):
-    """定义具体维度"""
-    @property
-    def dimension(self):
-        return 6
+class QuadraticFunction(Vector):
+    """
+    实现类QuadraticFunction(Vector)
+    表示ax2 + bx + c形式的函数生成的向量子空间
+    """
+    def __init__(self, a, b, c):
+        self.a = a
+        self.b = b
+        self.c = c
+
+    def add(self, v):
+        return QuadraticFunction(self.a + v.a,
+                                 self.b + v.b,
+                                 self.c + v.c)
+
+    def scale(self, scalar):
+        return QuadraticFunction(scalar * self.a,
+                                 scalar * self.b,
+                                 scalar * self.c)
+
+    def __call__(self, x):
+        return self.a * x * x + self.b * x + self.c
+
+    @classmethod
+    def zero(cls):
+        return QuadraticFunction(0, 0, 0)
 
 
 # Test functions and random vector generators
