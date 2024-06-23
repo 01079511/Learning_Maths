@@ -254,9 +254,21 @@ class Polynomial(Vector):
     表示所有多项式的向量空间
     """
     def __init__(self, *coefficients):
+        """
+        初始化Polynomial对象
+        :param coefficients: 可变参数 *coefficients，表示多项式的系数，从常数项开始
+        """
         self.coefficients = coefficients
 
     def __call__(self, x):
+        """
+        使Polynomial对象可以像函数一样被调用，并计算多项式在给定输入值x处的值
+        enumerate(self.coefficients) enumerate(枚举)将self.coefficients生成一个迭代器，
+        返回一个(index, value)对，即(power, coefficient)对,
+        power表示系数对应的幂次，coefficient表示该幂次的系数
+        :param x: 给自变量x, 赋值
+        :return: sum所有多项式在x处的值作为输出结果
+        """
         return sum(coefficient * x ** power
                    for (power, coefficient)
                    in enumerate(self.coefficients))
