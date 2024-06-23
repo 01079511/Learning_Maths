@@ -201,7 +201,7 @@ class LinearFunction(Vec2):
         return LinearFunction(scalar * self.a, scalar * self.b)
 
     def __call__(self, input):
-        return self.b * input + self.b
+        return self.a * input + self.b
 
     @classmethod
     def zero(cls):
