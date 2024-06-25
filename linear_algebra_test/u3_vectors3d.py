@@ -11,7 +11,11 @@ edges = [((-1, y, z), (1, y, z)) for y in pm1 for z in pm1] +\
 
 
 def to_cartesian(polar_vector):
-    """ 极地坐标 -> 笛卡尔坐标 """
+    """
+    极地坐标 -> 笛卡尔坐标
+    解包: 提取polar_vector极地坐标的长度和角度
+    转换: 使用三角函数 极地坐标 ==> 笛卡尔坐标
+    """
     length, angle = polar_vector[0], polar_vector[1]
     return length*ma.cos(angle), length*ma.sin(angle)
 
@@ -23,10 +27,10 @@ def random_vector_of_length(l):
 
 def scale(scalar, v):
     """
-    标量相乘: 通过推导运算，将向量中的每个坐标乘以标量,这一个被转换成元组的生成器推导式。
+    标量相乘: 将向量v按照标量scalar进行缩放
     :param scalar: 标量
     :param v:向量
-    :return: 将向量中的每个坐标乘以标量,结果转换成为元组输出
+    :return: 缩放后的元组
     """
     return tuple(scalar * coord for coord in v)
 
@@ -42,8 +46,10 @@ def add(*vectors):
 
 def dot(u, v):
     """
-    点积函数:使用Python的zip函数对相应的坐标进行配对，然后在推导式中将每对坐标相乘，
-并添加到结果列表中
+    点积函数:计算u,v间的点积
+    zip(*vectors): 将输入向量根据坐标分组,如:((1, 2, 3), (4, 5, 6)) ==> [(1, 4), (2, 5), (3, 6)]
+    [coord1 * coord2 for coord1, coord2 in zip(u, v)],如上,输入后得到[1*4, 2*5, 3*6] => [4, 10, 18]
+    最后 sum([上述结果]) => sum([4, 10, 18]) => 4+10+18 => 32
     :param u: 向量,坐标数目和v相同
     :param v: 向量,坐标数目和u相同
     :return:点积值
@@ -53,7 +59,9 @@ def dot(u, v):
 
 def length(v):
     """
-    向量的长度
+    向量的长度 / 计算向量v的欧几里得长度
+    实现了向量从原点到向量坐标的距离计算
+    如:v = (3, 4) 从 [coord ** 2 for coord in v] => [9, 16] 再 sum[9, 16] => 25,最后 sqrt(25) => 5
     :param v: 坐标(2维/3维都可)
     :return: 长度
     """
