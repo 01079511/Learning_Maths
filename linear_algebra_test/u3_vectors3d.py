@@ -107,8 +107,7 @@ if __name__ == '__main__':
     for l in list(vectors_with_whole_number_length()):
         print(l)
 
-
-# 练习3.15
+    # 练习3.15
     pairs = [(random_vector_of_length(3), random_vector_of_length(7))
              for i in range(0, 3)]
     for u, v in pairs:
