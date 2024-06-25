@@ -2,6 +2,7 @@ import pygame
 import v7_vectors as vectors
 from math import pi, sqrt, cos, sin, atan2
 from random import randint, uniform
+from linear_solver import do_segments_intersect
 import sys
 
 
@@ -20,6 +21,15 @@ class PolygonModel():
         self.x = 0
         self.y = 0
 
+    def transformed(self):
+        rotated = [vectors.rotate2d(self.rotation_angle, v) for v in self.points]
+        return [vectors.add((self.x, self.y), v) for v in rotated]
+
+    def does_intersect(self, other_segment):
+        for segment in self.segments():
+            if do_segments_intersect(other_segment, segment):
+                return True
+        return False
 
 class Ship(PolygonModel):
     """
@@ -32,6 +42,17 @@ class Ship(PolygonModel):
         super().__init__([(0.5, 0),
                           (-0.25, 0.25),
                           (-0.25, -0.25)])
+
+    def laser_segment(self):
+        """
+        在二维世界中，激光束应该是一条线段，从经过变换的宇宙飞船顶端开始，向飞船指向的方向延伸
+        :return:
+        """
+        dist = 20. * sqrt(2)  # 使用勾股定理找到屏幕上的最长线段
+        x, y = self.transformed()[0]  # 获取定义线段的第一点(飞船的顶端)的值
+        return ((x, y),
+                (x + dist * cos(self.rotation_angle),
+                 y + dist*sin(self.rotation_angle)))  # 如果激光以角度 self.rotation_angle 从顶端(x, y)延伸dist 单位，则使用三角函数找到激光的终点
 
 
 class Asteroid(PolygonModel):
