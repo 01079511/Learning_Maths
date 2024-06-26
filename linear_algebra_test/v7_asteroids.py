@@ -22,19 +22,27 @@ class PolygonModel():
         self.y = 0
 
     def transformed(self):
-        rotated = [vectors.rotate2d(self.rotation_angle, v) for v in self.points]
+        """
+        用于计算多边形在经过旋转和平移后的变换点(该方法返回由对象的 x 属性和 y 属性转换并由 rotation_angle 属性旋转的模型的点)
+        它将多边形的每个点首先按照指定角度旋转，然后平移到指定位置
+        :return: 包含旋转和平移后的点
+        """
+        # 旋转遍历生成都多边形的每个点，通过rotate2d将其绕原点旋转rotation_angle角度
+        rotated = [vectors.rotate2d(self.rotation_angle, v) for v in self.points]  # 包含旋转后的列表
+        # 平移,通过add(self.x, self.y), v)平移self.x, self.y
         return [vectors.add((self.x, self.y), v) for v in rotated]
 
     def does_intersect(self, other_segment):
         """
-
-        :param other_segment:
-        :return:
+        检查多边形是否与另一线段相交
+        :param other_segment:另一个线段
+        :return:布尔值，表示是否相交
         """
         for segment in self.segments():
-            if do_segments_intersect(other_segment, segment):
+            if do_segments_intersect(other_segment, segment):  # 如果other_segment, segment相交,返回true
                 return True
         return False
+
 
 class Ship(PolygonModel):
     """
@@ -100,7 +108,7 @@ def to_pixels(x, y):
     将坐标从我们的坐标系映射成PyGame的像素坐标
     :param x:
     :param y:
-    :return:
+    :return:对应的屏幕像素坐标(px,py)
     """
     return width/2 + width * x / 20, height/2 - height * y / 20
 
