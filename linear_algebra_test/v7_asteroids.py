@@ -2,7 +2,7 @@ import pygame
 import v7_vectors as vectors
 from math import pi, sqrt, cos, sin, atan2
 from random import randint, uniform
-from linear_solver import do_segments_intersect
+from v7_linear_solver import do_segments_intersect
 import sys
 
 
@@ -26,6 +26,11 @@ class PolygonModel():
         return [vectors.add((self.x, self.y), v) for v in rotated]
 
     def does_intersect(self, other_segment):
+        """
+
+        :param other_segment:
+        :return:
+        """
         for segment in self.segments():
             if do_segments_intersect(other_segment, segment):
                 return True
