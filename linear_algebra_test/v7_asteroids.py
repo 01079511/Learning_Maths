@@ -32,6 +32,32 @@ class PolygonModel():
         # 平移,通过add(self.x, self.y), v)平移self.x, self.y
         return [vectors.add((self.x, self.y), v) for v in rotated]
 
+    def segments(self):
+        """
+        以避免重复返回构成多边形的（已变换的）线段，这很方便。
+        然后，我们可以检查另一个多边形的每一条线段，
+        看它与当前多边形的does_intersect是否返回True
+        :return:
+        """
+        point_count = len(self.points)
+        points = self.transformed()
+        return [(points[i], points[(i+1) % point_count])
+                for i in range(0, point_count)]
+
+    def does_collide(self, other_poly):
+        """
+        实现does_collide(other_polygon)方法，
+        通过检查定义两个多边形的任何线段是否相交,
+        来确定当前PolygonModel对象是否与other_polygon发生碰撞。
+        这可以帮助我们确定小行星是撞击了飞船还是撞击了另一颗小行星。
+        :param other_poly:
+        :return:
+        """
+        for other_segment in other_poly.segments():
+            if self.does_intersect(other_segment):
+                return True
+        return False
+
     def does_intersect(self, other_segment):
         """
         检查多边形是否与另一线段(如原点射出的射线)相交
@@ -124,6 +150,13 @@ def draw_poly(screen, polygon_model, color=GREEN):
     """
     pixel_points = [to_pixels(x, y) for x, y in polygon_model.transformed()]
     pygame.draw.aalines(screen, color, True, pixel_points, 10)
+
+
+# asteroid = PolygonModel([(2, 7), (1, 5), (2, 3), (4, 2), (6, 2), (7, 4), (6, 6), (4, 6)])
+# print(asteroid.does_intersect([(0, 0), (7, 7)]))
+
+
+
 
 
 
