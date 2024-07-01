@@ -38,7 +38,7 @@ def intersection(u1, u2, v1, v2):
     c = np.array((c1, c2))
     return np.linalg.solve(m, c)
 
-## Will fail if lines are parallel!
+# Will fail if lines are parallel!
 # def do_segments_intersect(s1,s2):
 #     u1,u2 = s1
 #     v1,v2 = s2

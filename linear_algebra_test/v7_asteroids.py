@@ -39,7 +39,8 @@ class PolygonModel():
         :return:布尔值，表示是否相交
         """
         for segment in self.segments():
-            if do_segments_intersect(other_segment, segment):  # 如果多边形的任何一条线段与other_segment相交，则该方法返回True
+            # 如果多边形的任何一条线段与other_segment相交，则该方法返回True
+            if do_segments_intersect(other_segment, segment):
                 return True
         return False
 
