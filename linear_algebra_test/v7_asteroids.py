@@ -34,12 +34,12 @@ class PolygonModel():
 
     def does_intersect(self, other_segment):
         """
-        检查多边形是否与另一线段相交
+        检查多边形是否与另一线段(如原点射出的射线)相交
         :param other_segment:另一个线段
         :return:布尔值，表示是否相交
         """
         for segment in self.segments():
-            if do_segments_intersect(other_segment, segment):  # 如果other_segment, segment相交,返回true
+            if do_segments_intersect(other_segment, segment):  # 如果多边形的任何一条线段与other_segment相交，则该方法返回True
                 return True
         return False
 

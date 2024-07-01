@@ -4,7 +4,9 @@ from v7_vectors import distance
 
 def standard_form(v1, v2):
     """
-    将一条直线的2个点v1, v2 转换为直线的标准形式ax + by = c
+    将一条直线的2个点v1, v2 转换为直线的标准形式:
+    ax + by = c,
+    a = (y2 - y1), b = -(x2 − x1) = (x1 − x2), c = (x1y2 - x2y1)
     :param v1:
     :param v2:
     :return:直线的标准形式参数
@@ -21,7 +23,7 @@ def intersection(u1, u2, v1, v2):
     """
     计算2条直线的交点
     利用standard_form函数将u1,u2和v1,v2转换为标准形式
-    构建矩阵m和向量c, 通过np.linalg.solve(m, c)解决线性方程组
+    构建矩阵m和向量c, 通过np.linalg.solve(m, c)解线性方程组,得到解向量
     得到交点(x, y),注意平行的话np.linalg.solve会抛出异常
     :param u1: 直线u
     :param u2:
@@ -80,9 +82,11 @@ def do_segments_intersect(s1, s2):
     """
     u1, u2 = s1
     v1, v2 = s2
-    d1, d2 = distance(*s1), distance(*s2)
+    d1, d2 = distance(*s1), distance(*s2)  # 将第一条线段和第二条线段的长度分别存储为d1和d2
     try:
-        x, y = intersection(u1, u2, v1, v2)
+        x, y = intersection(u1, u2, v1, v2)  # 找出线段所在直线的交点(x, y)
+
+        # 进行4次检查以确保交点 位于线段的4个端点之间，确认线段相交
         return (distance(u1, (x, y)) <= d1 and
                 distance(u2, (x, y)) <= d1 and
                 distance(v1, (x, y)) <= d2 and
