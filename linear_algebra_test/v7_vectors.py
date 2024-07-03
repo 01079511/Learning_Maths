@@ -197,3 +197,29 @@ def linear_combination(scalars, *vectors):
     """
     scaled = [scale(s, v) for s, v in zip(scalars, vectors)]
     return add(*scaled)
+
+
+def plane_equation(p1, p2, p3):
+    """
+    实现类: 输入是三个三维点,返回它们所在平面的标准方程;
+    示例: 如果标准方程是ax + by + cz = d，则函数可以返回元组(a, b, c, d)
+    逻辑: 如果给定的点是p1、p2、p3,
+    那么向量差p3 − p1和p2 − p1平行于平面。那么向量积(p2 − p1) × (p3 − p1)就垂直于平面,
+    (只要p1、p2、p3三点组成一个三角形，向量差之间就不平行),有了平面上的一点(如p1)和一个垂直的向量,
+    根据两个垂直的向量点积为0,得到ax+by=c,垂线焦点(x0,y0),(a,b)*(x0,y0) = c,
+    即,两个垂直的向量点积为d,(a, b, c) · p1 = d 得出d
+    :param p1:三维点之一
+    :param p2:三维点之一
+    :param p3:三维点之一
+    :return:标准方程的参数元组
+    """
+    parallel1 = subtract(p2, p1)
+    parallel2 = subtract(p3, p1)
+    a, b, c = cross(parallel1, parallel2)
+    d = dot((a, b, c), p1)
+    return a, b, c, d
+
+# 测试plane_equation()
+# print(plane_equation((1,1,1), (3,0,0), (0,3,0)))
+
+
