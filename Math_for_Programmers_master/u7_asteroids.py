@@ -1,8 +1,8 @@
 import pygame
-import v7_vectors as vectors
+import u7_vectors as vectors
 from math import pi, sqrt, cos, sin, atan2
 from random import randint, uniform
-from v7_linear_solver import do_segments_intersect
+from u7_linear_solver import do_segments_intersect
 import sys
 
 

@@ -1,5 +1,5 @@
 import numpy as np
-from v7_vectors import distance
+from u7_vectors import distance
 
 
 def standard_form(v1, v2):

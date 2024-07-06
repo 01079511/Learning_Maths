@@ -32,9 +32,11 @@ def newton(x0, epsilon=1e-10, max_iter=100):
         n += 1
     return None
 
+
 # 测试牛顿法求解 x^5 + 2x - 1 = 0 的近似解
 def f(x):
     return x**5 + 2*x - 1
+
 
 approx_solution, n = newton(0)
 
