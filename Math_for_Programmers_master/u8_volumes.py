@@ -38,29 +38,27 @@ def plot_function(f, tmin, tmax, tlabel=None, xlabel=None, axes=False, **kwargs)
 
 
 def plot_volume(f, tmin, tmax, axes=False, **kwargs):
+    # 绘制体积随时间变化的图像,标注x/y轴标识
     plot_function(f, tmin, tmax,
                   tlabel="time (hr)", xlabel="volume (bbl)",
                   axes=axes, **kwargs)
 
 
 def plot_flow_rate(f, tmin, tmax, axes=False, **kwargs):
+    # 绘制流量随时间变化的图像,标注x/y轴标识
     plot_function(f, tmin, tmax,
                   tlabel="time (hr)", xlabel="flow rate (bbl/hr)",
                   axes=axes, **kwargs)
 
 
 def volume(t):
-    # volume 函数
+    # 定义体积随时间变化的函数(直接给出)
     return (t-4)**3 / 64 + 3.3
 
 
 def flow_rate(t):
+    # 定义流量随时间变化的函数(直接给出)
     return 3*(t-4)**2 / 64
-
-
-plot_volume(volume, 0, 10)
-plt.show()
-plt.close()
 
 
 def average_flow_rate(v, t1, t2):
@@ -74,9 +72,42 @@ def average_flow_rate(v, t1, t2):
     return (v(t2) - v(t1))/(t2 - t1)
 
 
+def secant_line(f, x1, x2):
+    """
+    割线
+    :param f:收函数f(x)
+    :param x1:值
+    :param x2:值
+    :return:一个表示随时间变化割线的新函数
+    """
+    def line(x):
+        return f(x1) + (x-x1) * (f(x2)-f(x1))/(x2-x1)
+    return line
+
+
+def plot_secant(f, x1, x2, color='k'):
+    """
+    # 结合secant_line,实现两个给定点之间绘制函数f的割线
+    :param f: 用于接受函数
+    :param x1:
+    :param x2:
+    :param color:颜色
+    :return:
+    """
+    line = secant_line(f, x1, x2)
+    plot_function(line, x1, x2, c=color)
+    plt.scatter([x1, x2], [f(x1), f(x2)], c=color)
+
+
 print('volume(4)={0:.2f},\n'
       'volume(9)={1:.2f},\n'
       'average_flow_rate(volume,4,9)={2:.2f}'.format(volume(4),
                                                  volume(9),
                                                  average_flow_rate(volume, 4, 9)))
-
+# 体积随时间变化曲线
+plot_volume(volume, 0, 10)
+# 割线
+plot_secant(volume, 4, 8)
+# 画图
+plt.show()
+plt.close()
