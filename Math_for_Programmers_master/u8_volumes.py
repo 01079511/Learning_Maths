@@ -96,7 +96,7 @@ def plot_secant(f, x1, x2, color='k'):
     """
     line = secant_line(f, x1, x2)
     plot_function(line, x1, x2, c=color)
-    plt.scatter([x1, x2], [f(x1), f(x2)], c=color)
+    plt.scatter([x1, x2], [f(x1), f(x2)], c=color)  # 绘制散点图
 
 
 print('volume(4)={0:.2f},\n'
