@@ -38,14 +38,19 @@ def plot_function(f, tmin, tmax, tlabel=None, xlabel=None, axes=False, **kwargs)
 
 
 def plot_volume(f, tmin, tmax, axes=False, **kwargs):
-    plot_function(f, tmin, tmax, tlabel="time (hr)", xlabel="volume (bbl)", axes=axes, **kwargs)
+    plot_function(f, tmin, tmax,
+                  tlabel="time (hr)", xlabel="volume (bbl)",
+                  axes=axes, **kwargs)
 
 
 def plot_flow_rate(f, tmin, tmax, axes=False, **kwargs):
-    plot_function(f, tmin, tmax, tlabel="time (hr)", xlabel="flow rate (bbl/hr)", axes=axes, **kwargs)
+    plot_function(f, tmin, tmax,
+                  tlabel="time (hr)", xlabel="flow rate (bbl/hr)",
+                  axes=axes, **kwargs)
 
 
 def volume(t):
+    # volume 函数
     return (t-4)**3 / 64 + 3.3
 
 
@@ -57,7 +62,15 @@ plot_volume(volume, 0, 10)
 plt.show()
 plt.close()
 
+
 def average_flow_rate(v, t1, t2):
+    """
+    根据体积计算平均流速
+    :param v:体积函数v
+    :param t1:开始时间t1
+    :param t2:结束时间t2
+    :return:返回一个数，表示在这个时间段内进入油箱的平均流速
+    """
     return (v(t2) - v(t1))/(t2 - t1)
 
 
