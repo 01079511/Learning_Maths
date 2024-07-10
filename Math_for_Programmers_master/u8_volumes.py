@@ -149,6 +149,42 @@ def linear_volume_function(t):
     return 5 * t + 3
 
 
+def instantaneous_flow_rate(v, t, digits=6):
+    """
+    瞬时流速函数,(在微积分中称为体积函数的导数),实现从一个体积函数开始，产生一个相应的流速函数
+    存在问题:Python不能通过"目测"几条小割线的斜率来决定它们会收敛到什么数
+    解决方式:将割线不断缩短并计算其斜率，直到斜率数值稳定在某个固定的小数位上
+    :param v:体积函数
+    :param t:单一的时间点t
+    :param digits:
+    :return:获取某一时刻的瞬时流速
+    """
+    tolerance = 10 ** (-digits)  # 如果两个数相差小于容差(tolerance)10的–d次方，那么它们精确到小数点后d位是相同的
+    h = 1
+    approx = average_flow_rate(v, t-h, t+h)  # 首先计算目标点t 两侧h = 1个单位间隔上的割线斜率
+    for i in range(0, 2*digits):  # 作为一个粗略的近似值，我们在两次迭代之后放弃继续计算
+        h = h / 10  # 在每一步，将围绕点t的间隔缩小10倍
+        next_approx = average_flow_rate(v, t-h, t+h)  # 计算这个新间隔内割线的斜率
+        if abs(next_approx - approx) < tolerance:  # 如果最后两个近似值相差小于容差，则将四舍五入后的结果返回
+            return round(next_approx, digits)
+        else:
+            approx = next_approx
+    raise Exception("Derivative did not converge")  # 如果超过了最大的迭代次数，就表示程序没有收敛到一个结果
+
+
+def get_flow_rate_function(v):
+    """
+    柯里化(currying)瞬时流速函数
+    目的:实现与源代码中flow_rate函数行为类似的函数，
+    也就是接收一个时间变量并返回一个流速值的函数，对instantaneous_flow_rate函数进行柯里化
+    :param v:体积函数(v)
+    :return:流速函数
+    """
+    def flow_rate_function(t):
+        instantaneous_flow_rate(v, t)
+    return flow_rate_function
+
+
 print('volume(4)={0:.2f},\n'
       'volume(9)={1:.2f},\n'
       'average_flow_rate(volume,4,9)={2:.2f}\n'.format(volume(4),
@@ -171,7 +207,14 @@ print('volume(4)={0:.2f},\n'
 # 绘制decreasing_volume 函数流速随时间的变化图。什么时候其流速为最小值？也就是说，石油什么时候离开油箱的速度最快？
 # plot_interval_flow_rates(decreasing_volume, 0, 10, 0.5)
 # linear_volume_function函数,画出流速随时间的变化图,体现流速是恒定的 ==> 线性体积函数,流速不随时间变化
-plot_interval_flow_rates(linear_volume_function, 0, 10, 0.25)
+# plot_interval_flow_rates(linear_volume_function, 0, 10, 0.25)
+
+# 测试instantaneous_flow_rate(volume,1)
+# print("instantaneous_flow_rate(volume,1)={}\n".format(instantaneous_flow_rate(volume, 1)))
+
+# get_flow_rate_function(v)的输出是一个函数，与源代码中的flow_rate相同。画图测试
+# plot_function(flow_rate,0,10)
+# plot_function(get_flow_rate_function(volume), 0, 10)
 
 # 画图
 plt.show()
