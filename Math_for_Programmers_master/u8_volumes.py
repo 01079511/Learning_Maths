@@ -90,7 +90,7 @@ def secant_line(f, x1, x2):
     :param f:收函数f(x)
     :param x1:值
     :param x2:值
-    :return:一个表示随时间变化割线的新函数
+    :return:一个表示随时间变化割线的新函数line
     """
     def line(x):
         return f(x1) + (x-x1) * (f(x2)-f(x1))/(x2-x1)
@@ -181,8 +181,19 @@ def get_flow_rate_function(v):
     :return:流速函数
     """
     def flow_rate_function(t):
-        instantaneous_flow_rate(v, t)
+        return instantaneous_flow_rate(v, t)
     return flow_rate_function
+
+
+def sign(x):
+    """
+    证明该函数在x = 0处不存在导数,在时间间隔变得越来越小时，割线的斜率会越来越大，而不是收敛在一个值上
+    average_flow_rate(sign, -0.1, 0.1) => 10.0
+    average_flow_rate(sign, -0.000001, 0.000001) => 1000000.0
+    :param x:
+    :return:接收x,传入目标函数,如average_flow_rate
+    """
+    return x / abs(x)
 
 
 print('volume(4)={0:.2f},\n'
@@ -214,7 +225,7 @@ print('volume(4)={0:.2f},\n'
 
 # get_flow_rate_function(v)的输出是一个函数，与源代码中的flow_rate相同。画图测试
 # plot_function(flow_rate,0,10)
-# plot_function(get_flow_rate_function(volume), 0, 10)
+plot_function(get_flow_rate_function(volume), 0, 10)
 
 # 画图
 plt.show()
