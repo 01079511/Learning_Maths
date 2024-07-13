@@ -196,6 +196,31 @@ def sign(x):
     return x / abs(x)
 
 
+def small_volume_change(q,t,dt):
+    """
+    体积变化的近似值:
+    体积的变化约等于 流速*经过的时间
+    :param q:流速函数q
+    :param t:输入时间t
+    :param dt:间隔dt
+    :return:体积的变化
+    """
+    return q(t) * dt
+
+
+def volume_change(q, t1, t2, dt):
+    """
+
+    :param q:流速函数q
+    :param t1:开始时间
+    :param t2:结束时间
+    :param dt:间隔
+    :return:dt间隔内的体积总变化
+    """
+    return sum(small_volume_change(q, t, dt)
+               for t in np.arange(t1, t2, dt))  # 调用 np.arrange (t1,t2,dt)可以给我们提供一个从t1到t2的、增量为dt的时间数组
+
+
 print('volume(4)={0:.2f},\n'
       'volume(9)={1:.2f},\n'
       'average_flow_rate(volume,4,9)={2:.2f}\n'.format(volume(4),
@@ -225,7 +250,25 @@ print('volume(4)={0:.2f},\n'
 
 # get_flow_rate_function(v)的输出是一个函数，与源代码中的flow_rate相同。画图测试
 # plot_function(flow_rate,0,10)
-plot_function(get_flow_rate_function(volume), 0, 10)
+# plot_function(get_flow_rate_function(volume), 0, 10)
+
+# 体积函数和流速函数对比,间隔大则误差大
+# print(small_volume_change(flow_rate, 2, 1))
+# 0.1875
+# print(volume(3) - volume(2))
+# 0.109375
+
+# 分拆极小间隔求和, 实现缩短误差
+# print(volume_change(flow_rate, 0, 10, 0.1))
+# 4.32890625
+# print(volume(10) - volume(0))
+# 4.375
+# 实践:前6小时内大约有多少石油被添加到油箱中
+# print(volume_change(flow_rate,0,6,0.01))
+# 1.1278171874999996
+# 最后4小时内大约有多少石油被添加到油箱中
+# print(volume_change(flow_rate,6,10,0.01))
+# 3.2425031249999257
 
 # 画图
 plt.show()
