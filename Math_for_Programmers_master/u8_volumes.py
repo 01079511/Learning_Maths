@@ -196,7 +196,7 @@ def sign(x):
     return x / abs(x)
 
 
-def small_volume_change(q,t,dt):
+def small_volume_change(q, t, dt):
     """
     体积变化的近似值:
     体积的变化约等于 流速*经过的时间
@@ -210,7 +210,7 @@ def small_volume_change(q,t,dt):
 
 def volume_change(q, t1, t2, dt):
     """
-
+    目的:因为在短间隔内可以得到很好的体积变化近似值，所以我们可以把它们累加起来，得到较长间隔内的体积变化。
     :param q:流速函数q
     :param t1:开始时间
     :param t2:结束时间
