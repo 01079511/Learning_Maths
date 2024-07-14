@@ -211,6 +211,10 @@ def small_volume_change(q, t, dt):
 def volume_change(q, t1, t2, dt):
     """
     目的:因为在短间隔内可以得到很好的体积变化近似值，所以我们可以把它们累加起来，得到较长间隔内的体积变化。
+    问题:
+    如果,使宽度为0.5小时的8个矩形超过了3.9小时对应的范围，我们还是使用所有8个矩形的面积来进行计算！
+    为了让计算精确，应该将最后一个矩形的时间间隔缩短到0.4小时。
+    这个矩形从第7个间隔末的3.5小时持续到结束时间3.9小时，不再覆盖更多范围,需要迭代 volume_change
     :param q:流速函数q
     :param t1:开始时间
     :param t2:结束时间
@@ -219,6 +223,55 @@ def volume_change(q, t1, t2, dt):
     """
     return sum(small_volume_change(q, t, dt)
                for t in np.arange(t1, t2, dt))  # 调用 np.arrange (t1,t2,dt)可以给我们提供一个从t1到t2的、增量为dt的时间数组
+
+
+def approximate_volume(q, v0, dt, T):
+    """
+    实现: T时刻的体积 = (0时刻的体积) + (从0时刻到T时刻的体积变化值)
+    :param q:流速函数q
+    :param v0: 0时刻油箱中的体积
+    :param dt: 间隔
+    :param T:T时刻
+    :return:从0时刻到T时刻的体积变化值
+    """
+    return v0 + volume_change(q, 0, T, dt)
+
+
+def approximate_volume_function(q, v0, dt):
+    """
+    柯里化 approximate_volume
+    :param q: 流速函数q
+    :param v0:0时刻油箱中的体积
+    :param dt:间隔
+    :return:参数T作为输入的函数
+    """
+    def volume_function(T):
+        return approximate_volume(q, v0, dt, T)
+    return volume_function
+
+
+def get_volume_function(q, v0, digits=6):
+    """
+    对于任意时间点t,用越来越小的dt值重复计算volume_change(q,0,t,dt),直到输出稳定在容差范围内.
+    这看起来很像之前对导数进行反复逼近(instantaneous_flow_rate),直到它稳定下来的过程。
+    :param q:流速函数q
+    :param v0:0时刻油箱中的体积
+    :param digits:任意容差
+    :return:
+    """
+    def volume_function(T):
+        tolerance = 10 ** (-digits)
+        dt = 1
+        approx = v0 + volume_change(q, 0, T, dt)
+        for i in range(0, digits*2):
+            dt = dt / 10
+            next_approx = v0 + volume_change(q, 0, T, dt)
+            if abs(next_approx - approx) < tolerance:
+                return round(next_approx,digits)
+            else:
+                approx = next_approx
+        raise Exception("Did not converge!")
+    return volume_function
 
 
 print('volume(4)={0:.2f},\n'
@@ -269,6 +322,16 @@ print('volume(4)={0:.2f},\n'
 # 最后4小时内大约有多少石油被添加到油箱中
 # print(volume_change(flow_rate,6,10,0.01))
 # 3.2425031249999257
+
+# 计算在任意时间点上油箱中的石油总体积
+# plot_function(approximate_volume_function(flow_rate, 2.3, 0.01), 0, 10)
+# plot_function(volume, 0, 10)
+
+# 随着dt值越来越小，体积近似值趋近于volume 函数的精确值。它所趋近的结果称为流速的积分
+# v = get_volume_function(flow_rate, 2.3, digits=3)
+# print(v(1))
+# v = get_volume_function(flow_rate, 2.3, digits=6)
+# print(v(1))
 
 # 画图
 plt.show()
