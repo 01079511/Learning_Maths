@@ -14,12 +14,17 @@ class PolygonModel():
         """
         当飞船或小行星移动时，通过self.x和self.y进行平移，
         并通过self.rotation_angle进行旋转，可以找出其实际位置
+        vx和vy属性存储了vx = x'(t)和vy = y'(t)当前的值。默认情况下，它们的值为0，表示对象没有运动
         :param points:
         """
         self.points = points
         self.rotation_angle = 0
         self.x = 0
         self.y = 0
+        self.vx = 0
+        self.vy = 0
+        self.angular_velocity = 0
+        self.draw_center = False
 
     def transformed(self):
         """
@@ -70,6 +75,21 @@ class PolygonModel():
                 return True
         return False
 
+    def move(self, milliseconds):
+        dx, dy = (self.vx * milliseconds / 1000.0,
+                  self.vy * milliseconds / 1000.0)
+        self.x, self.y = vectors.add((self.x, self.y),
+                                     (dx, dy))
+        if self.x < -10:
+            self.x += 20
+        if self.y < -10:
+            self.y += 20
+        if self.x > 10:
+            self.x -= 20
+        if self.y > 10:
+            self.y -= 20
+        self.rotation_angle += self.angular_velocity * milliseconds / 1000.0
+
 
 class Ship(PolygonModel):
     """
@@ -100,13 +120,19 @@ class Asteroid(PolygonModel):
     小行星实例是 PolygonModel 的具体例子
     """
     def __init__(self):
+        """
+        vx和vy,表示将x和y 方向上的速度设置为–1和1之间的随机值
+        为负值的导数意味着函数值在减小，而正值意味着函数值在增大
+        """
         sides = randint(5, 9)  # 行星的边数是5和9之间的一个随机整数
         vs = [vectors.to_cartesian((uniform(0.5, 1.0), 2 * pi * i / sides))
                 for i in range(0, sides)]  # 长度是0.5和1.0之间的随机浮点数,角度是2π/n的倍数,其中n是边数
         super().__init__(vs)
+        self.vx = uniform(-1, 1)
+        self.vy = uniform(-1, 1)
 
 
-# INITIALIZE GAME STATE:游戏的初始状态，需要一艘飞船和几颗小行星
+    # INITIALIZE GAME STATE:游戏的初始状态，需要一艘飞船和几颗小行星
 ship = Ship()
 
 # 开始时飞船在屏幕中心，小行星则随机分布在屏幕上。可以显示一个在x方向和y方向上分别为−10到10的平面区域
@@ -151,9 +177,99 @@ def draw_poly(screen, polygon_model, color=GREEN):
     pixel_points = [to_pixels(x, y) for x, y in polygon_model.transformed()]
     pygame.draw.aalines(screen, color, True, pixel_points, 10)
 
-
 # asteroid = PolygonModel([(2, 7), (1, 5), (2, 3), (4, 2), (6, 2), (7, 4), (6, 6), (4, 6)])
 # print(asteroid.does_intersect([(0, 0), (7, 7)]))
+
+
+def draw_segment(screen, v1, v2, color=RED):
+    """
+    2024.08.06
+    :param screen:
+    :param v1:
+    :param v2:
+    :param color:
+    :return:
+    """
+    pygame.draw.aaline(screen, color, to_pixels(*v1), to_pixels(*v2), 10)
+
+
+screenshot_mode = False
+
+# INITIALIZE GAME ENGINE
+
+def main():
+    """
+    2024.08.06
+    """
+    pygame.init()
+
+    screen = pygame.display.set_mode([width,height])
+
+    pygame.display.set_caption("Asteroids!")
+
+    done = False
+    clock = pygame.time.Clock()
+
+    # p key prints screenshot (you can ignore this variable)
+    p_pressed = False
+
+    while not done:
+
+        clock.tick()
+
+        for event in pygame.event.get(): # User did something
+            if event.type == pygame.QUIT: # If user clicked close
+                done=True # Flag that we are done so we exit this loop
+
+        # UPDATE THE GAME STATE
+
+        milliseconds = clock.get_time()
+        keys = pygame.key.get_pressed()
+
+        for ast in asteroids:
+            ast.move(milliseconds)
+
+        if keys[pygame.K_LEFT]:
+            ship.rotation_angle += milliseconds * (2*pi / 1000)
+
+        if keys[pygame.K_RIGHT]:
+            ship.rotation_angle -= milliseconds * (2*pi / 1000)
+
+        laser = ship.laser_segment()
+
+        # p key saves screenshot (you can ignore this)
+        if keys[pygame.K_p] and screenshot_mode:
+            p_pressed = True
+        elif p_pressed:
+            pygame.image.save(screen, 'figures/asteroid_screenshot_%d.png' % milliseconds)
+            p_pressed = False
+
+        # DRAW THE SCENE
+
+        screen.fill(WHITE)
+
+        if keys[pygame.K_SPACE]:
+            draw_segment(screen, *laser)
+
+        draw_poly(screen,ship)
+
+        for asteroid in asteroids:
+            if keys[pygame.K_SPACE] and asteroid.does_intersect(laser):
+                asteroids.remove(asteroid)
+            else:
+                draw_poly(screen, asteroid, color=GREEN)
+
+
+        pygame.display.flip()
+
+    pygame.quit()
+
+
+if __name__ == "__main__":
+    if '--screenshot' in sys.argv:
+        screenshot_mode = True
+    main()
+
 
 
 
