@@ -197,6 +197,7 @@ screenshot_mode = False
 
 # INITIALIZE GAME ENGINE
 
+
 def main():
     """
     2024.08.06
@@ -217,9 +218,9 @@ def main():
 
         clock.tick()
 
-        for event in pygame.event.get(): # User did something
-            if event.type == pygame.QUIT: # If user clicked close
-                done=True # Flag that we are done so we exit this loop
+        for event in pygame.event.get():  # User did something
+            if event.type == pygame.QUIT:  # If user clicked close
+                done = True  # Flag that we are done so we exit this loop
 
         # UPDATE THE GAME STATE
 
@@ -258,7 +259,6 @@ def main():
                 asteroids.remove(asteroid)
             else:
                 draw_poly(screen, asteroid, color=GREEN)
-
 
         pygame.display.flip()
 
