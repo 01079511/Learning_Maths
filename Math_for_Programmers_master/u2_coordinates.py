@@ -28,7 +28,7 @@ def perimeter(vectors):
     return distances, sum(distances)
 
 
-def scale(scalar,v):
+def scale(scalar, v):
     """ 将输入向量v和输入标量s相乘 """
     return scalar * v[0], scalar * v[1]
 
