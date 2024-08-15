@@ -76,12 +76,25 @@ class PolygonModel():
         return False
 
     def move(self, milliseconds):
+        """
+        目的: 该方法根据这个公式更新对象的坐标
+        说明: 欧拉方法的第一个简单应用。
+        该算法包括跟踪一个或多个函数的值
+        (在我们的例子中，是坐标x(t)和 y(t)以及它们的导数 x'(t)=vx和 y'(t)=vy),
+        并在每一步中根据它们的导数更新函数。
+        如果导数是恒定的，这种方法就非常有效，即使导数本身是变化的，这依旧是一个相当好的近似方法
+        :param milliseconds:因为经过的时间是未知的，所以我们把它传递进来（单位是毫秒）
+        :return:
+        """
         dx, dy = (self.vx * milliseconds / 1000.0,
                   self.vy * milliseconds / 1000.0)
         self.x, self.y = vectors.add((self.x, self.y),
                                      (dx, dy))
+        # 为了保持小行星在屏幕区域内，我们可以添加一些逻辑，让两个坐标保持在最小值 –10 和最大值10之间
+        # 当x < –10时，小行星会超出屏幕左侧，所以我们在x坐标上加20个单位，将其传送到屏幕右侧
         if self.x < -10:
             self.x += 20
+        # 当y < –10时，小行星会超出屏幕底部，所以我们在y坐标上加20个单位，将其传送到屏幕顶部
         if self.y < -10:
             self.y += 20
         if self.x > 10:
@@ -132,7 +145,7 @@ class Asteroid(PolygonModel):
         self.vy = uniform(-1, 1)
 
 
-    # INITIALIZE GAME STATE:游戏的初始状态，需要一艘飞船和几颗小行星
+# INITIALIZE GAME STATE:游戏的初始状态，需要一艘飞船和几颗小行星
 ship = Ship()
 
 # 开始时飞船在屏幕中心，小行星则随机分布在屏幕上。可以显示一个在x方向和y方向上分别为−10到10的平面区域
@@ -146,12 +159,13 @@ for ast in asteroids:
 
 
 # HELPERS / SETTINGS
-BLACK = (  0,   0,   0)
+BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
-BLUE =  (  0,   0, 255)
-GREEN = (  0, 255,   0)
-RED =   (255,   0,   0)
-
+BLUE = (0, 0, 255)
+GREEN = (0, 255, 0)
+RED = (255, 0, 0)
+LIGHT_GRAY = (240, 240, 240)
+DARK_GRAY = (128, 128, 128)
 # 屏幕像素
 width, height = 400, 400
 
@@ -166,16 +180,21 @@ def to_pixels(x, y):
     return width/2 + width * x / 20, height/2 - height * y / 20
 
 
-def draw_poly(screen, polygon_model, color=GREEN):
+def draw_poly(screen, polygon_model, color=BLACK):
     """
-    绘制连接给定点和指定 PyGame 对象的线，参数(closed)True 指定了连接第一个点和最后一个点来创建一个闭合多边形
+    绘制连接给定点和指定 PyGame 对象的线
     :param screen:
     :param polygon_model:
     :param color:
     :return:
     """
     pixel_points = [to_pixels(x, y) for x, y in polygon_model.transformed()]
-    pygame.draw.aalines(screen, color, True, pixel_points, 10)
+    pygame.draw.lines(screen, color, True, pixel_points, 2)
+    if polygon_model.draw_center:
+        cx, cy = to_pixels(polygon_model.x, polygon_model.y)
+        pygame.draw.circle(screen, BLACK, (int(cx), int(cy)), 4, 4)
+    # pixel_points = [to_pixels(x, y) for x, y in polygon_model.transformed()]
+    # pygame.draw.lines(screen, color, True, pixel_points, 10)
 
 # asteroid = PolygonModel([(2, 7), (1, 5), (2, 3), (4, 2), (6, 2), (7, 4), (6, 6), (4, 6)])
 # print(asteroid.does_intersect([(0, 0), (7, 7)]))
@@ -190,8 +209,22 @@ def draw_segment(screen, v1, v2, color=RED):
     :param color:
     :return:
     """
-    pygame.draw.aaline(screen, color, to_pixels(*v1), to_pixels(*v2), 10)
+    pygame.draw.aaline(screen, color, to_pixels(*v1), to_pixels(*v2), 2)
 
+
+def draw_grid(screen):
+    for x in range(-9, 10):
+        draw_segment(screen, (x, -10), (x, 10), color=LIGHT_GRAY)
+    for y in range(-9, 10):
+        draw_segment(screen, (-10, y), (10, y), color=LIGHT_GRAY)
+
+    draw_segment(screen, (-10, 0), (10, 0), color=DARK_GRAY)
+    draw_segment(screen, (0, -10), (0, 10), color=DARK_GRAY)
+
+
+# 原作固定参数: 通过试错，我发现加速幅度为3时，飞船有足够的机动性。让我们在游戏代码中加入这个常数
+# PyGame的工作单位是毫秒，所以相关的速度变化是每毫秒0.003 m/s，也就是0.003 m/s·ms
+acceleration = 3
 
 screenshot_mode = False
 
@@ -204,7 +237,7 @@ def main():
     """
     pygame.init()
 
-    screen = pygame.display.set_mode([width,height])
+    screen = pygame.display.set_mode([width, height])
 
     pygame.display.set_caption("Asteroids!")
 
@@ -223,20 +256,34 @@ def main():
                 done = True  # Flag that we are done so we exit this loop
 
         # UPDATE THE GAME STATE
-
-        milliseconds = clock.get_time()
+        # 对于游戏中的每一颗小行星，我们需要调用其move方法，
+        milliseconds = clock.get_time()  # 计算距离上一帧已经过去了多少毫秒
         keys = pygame.key.get_pressed()
 
+        # 向所有小行星发出信号，根据它们的速度更新其坐标
         for ast in asteroids:
             ast.move(milliseconds)
 
         if keys[pygame.K_LEFT]:
-            ship.rotation_angle += milliseconds * (2*pi / 1000)
+            ship.rotation_angle += milliseconds * (2 * pi / 1000)
 
         if keys[pygame.K_RIGHT]:
-            ship.rotation_angle -= milliseconds * (2*pi / 1000)
+            ship.rotation_angle -= milliseconds * (2 * pi / 1000)
 
-        laser = ship.laser_segment()
+        # 检测向上方向键是否被按下,加速度向量是(|a| · cos(θ), |a| · sin(θ))
+        if keys[pygame.K_UP]:
+            # 根据固定的加速度大小和飞船面对的角度计算ax和ay的值
+            ax = acceleration * cos(ship.rotation_angle)
+            ay = acceleration * sin(ship.rotation_angle)
+            # 分别以ax · ∆t和ay · ∆t更新x和y的速度
+            ship.vx += ax * milliseconds / 1000
+            ship.vy += ay * milliseconds / 1000
+
+        elif keys[pygame.K_DOWN]:
+            ax = - acceleration * cos(ship.rotation_angle)
+            ay = - acceleration * sin(ship.rotation_angle)
+            ship.vx += ax * milliseconds / 1000
+            ship.vy += ay * milliseconds / 1000
 
         # p key saves screenshot (you can ignore this)
         if keys[pygame.K_p] and screenshot_mode:
@@ -244,15 +291,21 @@ def main():
         elif p_pressed:
             pygame.image.save(screen, 'figures/asteroid_screenshot_%d.png' % milliseconds)
             p_pressed = False
+        # 移动飞船，使用更新后的速度来更新坐标
+        ship.move(milliseconds)
+
+        laser = ship.laser_segment()
 
         # DRAW THE SCENE
 
         screen.fill(WHITE)
 
+        draw_grid(screen)
+
         if keys[pygame.K_SPACE]:
             draw_segment(screen, *laser)
 
-        draw_poly(screen,ship)
+        draw_poly(screen, ship)
 
         for asteroid in asteroids:
             if keys[pygame.K_SPACE] and asteroid.does_intersect(laser):
