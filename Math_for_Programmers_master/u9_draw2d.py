@@ -153,4 +153,3 @@ def draw2d(*objects, origin=True, axes=True, grid=(1,1), nice_aspect_ratio=True,
         plt.savefig("images/"+save_as)
 
     plt.show()
-# 08.19

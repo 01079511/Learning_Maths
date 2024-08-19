@@ -99,7 +99,7 @@ class Variable(Expressions):
 
     def evaluate(self, **bindings):
         try:
-            return bindings[self.symbol]
+            return bindings[self.symbol]  # bindings是字典格式，如 x= 10 ==> bindings['x'] = 10
         except:
             raise KeyError("Variable '{}' is not bound.".format(self.symbol))
 
@@ -166,4 +166,3 @@ def distinct_variables(exp):
         raise TypeError("Not a valid expression.")
 
 
-# 08.19
