@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-
+import math
 
 class Expressions(metaclass=ABCMeta):
     @abstractmethod
@@ -121,9 +121,27 @@ class Apply(Expressions):
         self.function = function
         self.argument = argument
 
+    def evaluate(self, **bindings):
+        return _function_bindings[self.function.name](self.argument.evaluate(**bindings))
+
+
+# 在Apply类上维护一个已知函数的字典数据, 单独_表示该部分是私有属性,不被from import引用
+_function_bindings = {
+    "sin": math.sin,
+    "cos": math.cos,
+    "ln": math.log,
+    "sqrt": math.sqrt
+}
+
+_function_python = {
+    "sin": "math.sin({})",
+    "cos": "math.cos({})",
+    "ln": "math.log({})",
+    "sqrt": "math.sqrt({})"
+}
+
 
 """
-  
 (3x**2 + x) sin(x)的准确表示:
 f_expression = Product(>    
                Sum( 
