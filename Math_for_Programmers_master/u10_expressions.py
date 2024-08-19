@@ -23,6 +23,9 @@ class Power(Expressions):
         self.base = base
         self.exponent = exponent
 
+    def evaluate(self, **bindings):
+        return self.base.evaluate(**bindings) ** self.exponent.evaluate(**bindings)
+
 
 class Product(Expressions):
     """
@@ -49,6 +52,9 @@ class Sum(Expressions):
     def __init__(self, *exps):
         self.exps = exps
 
+    def evaluate(self, **bindings):
+        return sum([exp.evaluate(**bindings) for exp in self.exps])
+
 
 class Difference(Expressions):
     """
@@ -58,6 +64,9 @@ class Difference(Expressions):
     def __init__(self, exp1, exp2):
         self.exp1 = exp1
         self.exp2 = exp2
+
+    def evaluate(self, **bindings):
+        return self.exp1.evaluate(**bindings) - self.exp2.evaluate(**bindings)
 
 
 class Quotient(Expressions):
@@ -69,6 +78,9 @@ class Quotient(Expressions):
     def __init__(self, numerator, denominator):
         self.numerator = numerator
         self.denominator = denominator
+
+    def evaluate(self, **bindings):
+        return self.numerator.evaluate(**bindings) / self.denominator.evaluate(**bindings)
 
 
 class Negative(Expressions):
@@ -141,23 +153,20 @@ _function_python = {
 }
 
 
-"""
-(3x**2 + x) sin(x)的准确表示:
-f_expression = Product(>    
-               Sum( 
-                   Product( 
-                       Number(3), 
-                       Power( 
-                           Variable("x"), 
-                           Number(2))),  
-                   Variable("x")),  
-               Apply( 
-                   Function("sin"), 
-                   Variable("x"))) 
+# (3x**2 + x) sin(x)的准确表示:
+f_expression = Product(
+                Sum(
+                    Product(
+                        Number(3),
+                        Power(
+                            Variable("x"),
+                            Number(2))),
+                    Variable("x")),
+                Apply(
+                    Function("sin"),
+                    Variable("x")))
 
-Apply(Function("cos"),Sum(Power(Variable("x"),Number("3")), Number(-5))) 
-
-"""
+# Apply(Function("cos"),Sum(Power(Variable("x"), Number("3")), Number(-5)))
 
 
 def distinct_variables(exp):
@@ -184,3 +193,10 @@ def distinct_variables(exp):
         raise TypeError("Not a valid expression.")
 
 
+# 测试
+def f(x):
+    return (3*x**2 + x) * math.sin(x)
+
+
+print("f(5) ={0},\nf_expression.evaluate(x=5) = {1}".format(f(5),
+                                                           f_expression.evaluate(x=5) ))
