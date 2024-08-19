@@ -33,6 +33,11 @@ class Product(Expressions):
         self.exp2 = exp2
 
     def evaluate(self, **bindings):
+        """
+        在乘积过程中不需要进行替换，但我们会将绑定关系传递给两个子表达式，以防其中包含Variable
+        :param bindings:
+        :return:
+        """
         return self.exp1.evaluate(**bindings) * self.exp2.evaluate(**bindings)
 
 
