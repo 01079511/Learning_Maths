@@ -166,3 +166,4 @@ def distinct_variables(exp):
         raise TypeError("Not a valid expression.")
 
 
+# 08.19
