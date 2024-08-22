@@ -51,6 +51,15 @@ class Expressions(metaclass=ABCMeta):
         global_vars = {"math": math}
         return eval(self._python_expr(), global_vars, bindings)
 
+    @abstractmethod
+    def derevative(self, var):
+        """
+        对变量 var 求导数
+        :param var: 变量
+        :return: 导数值
+        """
+        pass
+
 
 class Power(Expressions):
     """
@@ -120,6 +129,13 @@ class Product(Expressions):
     def _python_expr(self):
         return "({})*({})".format(self.exp1._python_expr(), self.exp2._python_expr())
 
+    def derevative(self, var):
+        return  Sum(
+            Product(self.exp1.derevative(var), self.exp2),
+            Product(self.exp1, self.exp2.derevative(var))
+        )
+
+
 class Sum(Expressions):
     """
     组合器: Sum 接收任意数量的输入表达式
@@ -138,7 +154,10 @@ class Sum(Expressions):
         return "Sum({})".format(",".join([e.display() for e in self.exps]))
 
     def _python_expr(self):
-        return "+".join("({})".format(exp._python_expr()) for exp in self.exps )
+        return "+".join("({})".format(exp._python_expr()) for exp in self.exps)
+
+    def derevative(self, var):
+        return Sum(*[exp.derevative(var) for exp in self.exps])
 
 
 class Difference(Expressions):
@@ -219,6 +238,9 @@ class Number(Expressions):
     def _python_expr(self):
         return str(self.number)
 
+    def derevative(self, var):
+        return Number(0)
+
 
 class Variable(Expressions):
     """
@@ -241,6 +263,19 @@ class Variable(Expressions):
 
     def _python_expr(self):
         return self.symbol
+
+    def derevative(self, var):
+        """
+        只有当一个变量是我们要进行导数计算的变量时，它的导数才是1，否则导数就是0,
+        如果求f(x) = x的导数，结果是f'(x) = 1，对应的就是该直线的斜率。
+        求f(x) = c的导数应该得到0，因为c在这里代表一个常数，而不是函数f的参数
+        :param var: 变量
+        :return: 导数值
+        """
+        if self.symbol == var.symbol:
+            return Number(1)
+        else:
+            return Number(0)
 
 
 class Function():
@@ -292,22 +327,6 @@ _function_python = {
     "ln": "math.log({})",
     "sqrt": "math.sqrt({})"
 }
-
-
-# (3x**2 + x) sin(x)的准确表示(P311-图10-11):
-f_expression = Product(
-                Sum(
-                    Product(
-                        Number(3),
-                        Power(
-                            Variable("x"),
-                            Number(2))),
-                    Variable("x")),
-                Apply(
-                    Function("sin"),
-                    Variable("x")))
-
-# Apply(Function("cos"),Sum(Power(Variable("x"), Number("3")), Number(-5)))
 
 
 def distinct_variables(exp):
@@ -403,6 +422,21 @@ def contains_sum(exp):
 
 
 # 测试
+# (3x**2 + x) sin(x)的准确表示(P311-图10-11):
+f_expression = Product(
+                Sum(
+                    Product(
+                        Number(3),
+                        Power(
+                            Variable("x"),
+                            Number(2))),
+                    Variable("x")),
+                Apply(
+                    Function("sin"),
+                    Variable("x")))
+
+# Apply(Function("cos"),Sum(Power(Variable("x"), Number("3")), Number(-5)))
+
 def f(x):
     return (3*x**2 + x) * math.sin(x)
 
@@ -416,13 +450,13 @@ A = Variable('a')
 B = Variable('b')
 # print(Product(Sum(A, B), Sum(Y, Z)))
 # print(Product(Sum(A, B), Sum(Y, Z)).expand())
-print(f_expression.expand())
+# print(f_expression.expand())
 
 # 测试 _python_expr()和 python_function 效果对标evaluate()功能
 test1 = Power(Variable("x"), Number(2))
-print(test1._python_expr())
-print(test1.python_function(x=3))
-print(test1.evaluate(x=3))
+# print(test1._python_expr())
+# print(test1.python_function(x=3))
+# print(test1.evaluate(x=3))
 
 """
 eval() 说明:
@@ -437,3 +471,5 @@ locals -- 变量作用域，局部命名空间，如果被提供，可以是任�
 eval() 函数将字符串 expression 解析为 Python 表达式，并在指定的命名空间中执行它。
 注意点: eval() 函数会执行字符串内部的任何代码，风险点：恶意代码注入.
 """
+
+print(Product(Variable("c"), Variable("x")).derivative(Variable("x")))
