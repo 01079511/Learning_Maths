@@ -3,6 +3,7 @@ import math
 
 
 class Expressions(metaclass=ABCMeta):
+
     @abstractmethod
     def evaluate(self, **bindings):
         """
@@ -31,6 +32,25 @@ class Expressions(metaclass=ABCMeta):
     def __repr__(self):
         return self.display()
 
+    @abstractmethod
+    def _python_expr(self):
+        """
+        使用Python中的eval函数将其转化为可执行的Python函数。
+        将结果与evaluate方法进行比较。例如，Power(Variable("x"),Number(2))表示表达式x2。
+        这应该产生Python代码 x**2。然后使用Python的eval函数来执行这段代码，
+        并查看它与evaluate方法的结果是否匹配
+        :return:
+        """
+        pass
+
+    def python_function(self, **bindings):
+        #         code = "lambda {}:{}".format(
+        #             ", ".join(sorted(distinct_variables(self))),
+        #             self._python_expr())
+        #         print(code)
+        global_vars = {"math": math}
+        return eval(self._python_expr(), global_vars, bindings)
+
 
 class Power(Expressions):
     """
@@ -51,6 +71,9 @@ class Power(Expressions):
 
     def display(self):
         return "Power({},{})".format(self.base.display(), self.exponent.display())
+
+    def _python_expr(self):
+        return "({}) ** ({})".format(self.base._python_expr(), self.exponent._python_expr())
 
 
 class Product(Expressions):
@@ -77,8 +100,8 @@ class Product(Expressions):
         在最后一种情况下，不需要展开
         :return:
         """
-        expanded1 = self.exp1.expand  # 展开乘积的两个项
-        expanded2 = self.exp2.expand
+        expanded1 = self.exp1.expand()  # 展开乘积的两个项
+        expanded2 = self.exp2.expand()
         if isinstance(expanded1, Sum):
             # 如果乘积的第一个项是求和，则取其中的每项与乘积的第二个项相乘，然后在得到的结果上也调用expand方法，以防第二项也是求和
             return Sum(*[Product(e, expanded2).expand()
@@ -94,6 +117,8 @@ class Product(Expressions):
     def display(self):
         return "Product({}, {})".format(self.exp1.display(), self.exp2.display())
 
+    def _python_expr(self):
+        return "({})*({})".format(self.exp1._python_expr(), self.exp2._python_expr())
 
 class Sum(Expressions):
     """
@@ -107,10 +132,13 @@ class Sum(Expressions):
         return sum([exp.evaluate(**bindings) for exp in self.exps])
 
     def expand(self):
-        return sum(*[exp.expand() for exp in self.exps])
+        return Sum(*[exp.expand() for exp in self.exps])
 
     def display(self):
         return "Sum({})".format(",".join([e.display() for e in self.exps]))
+
+    def _python_expr(self):
+        return "+".join("({})".format(exp._python_expr()) for exp in self.exps )
 
 
 class Difference(Expressions):
@@ -127,6 +155,9 @@ class Difference(Expressions):
 
     def display(self):
         return "Difference({},{})".format(self.exp1.display(), self.exp2.display())
+
+    def _python_expr(self):
+        return "({}) - ({})".format(self.exp1._python_expr(), self.exp2._python_expr())
 
 
 class Quotient(Expressions):
@@ -145,6 +176,9 @@ class Quotient(Expressions):
     def display(self):
         return "Quotient({},{})".format(self.numerator.display(), self.denominator.display())
 
+    def _python_expr(self):
+        return "({}) / ({})".format(self.exp1._python_expr(), self.exp2._python_expr())
+
 
 class Negative(Expressions):
     """
@@ -162,6 +196,9 @@ class Negative(Expressions):
     def display(self):
         return "Negative({})".format(self.exp.display())
 
+    def _python_expr(self):
+        return "- ({})".format(self.exp._python_expr())
+
 
 class Number(Expressions):
     """
@@ -178,6 +215,9 @@ class Number(Expressions):
 
     def display(self):
         return "Number({})".format(self.number)
+
+    def _python_expr(self):
+        return str(self.number)
 
 
 class Variable(Expressions):
@@ -199,6 +239,9 @@ class Variable(Expressions):
     def display(self):
         return "Variable(\"{}\")".format(self.symbol)
 
+    def _python_expr(self):
+        return self.symbol
+
 
 class Function():
     """
@@ -207,17 +250,6 @@ class Function():
     def __init__(self, name, make_latex=None):
         self.name = name
         self.make_latex = make_latex
-
-    def latex(self, arg_latex):
-        """
-        待明确 2024.08.20
-        :param arg_latex:
-        :return:
-        """
-        if self.make_latex:
-            return self.make_latex(arg_latex)
-        else:
-            return " \\operatorname{{ {} }} \\left( {} \\right)".format(self.name, arg_latex)
 
 
 class Apply(Expressions):
@@ -241,6 +273,9 @@ class Apply(Expressions):
 
     def display(self):
         return "Apply(Function(\"{}\"),{})".format(self.function.name, self.argument.display())
+
+    def _python_expr(self):
+        return _function_python[self.function.name].format(self.argument._python_expr())
 
 
 # 在Apply类上维护一个已知函数的字典数据, 单独_表示该部分是私有属性,不被from import引用
@@ -299,6 +334,74 @@ def distinct_variables(exp):
         raise TypeError("Not a valid expression.")
 
 
+def contains(exp, var):
+    """
+    函数 contains(expression, variable)，检查给定的表达式是否包含指定的变量
+    通过 distinct_variables 的结果中, 可以很容易地检查变量是否存在
+    :param exp: 表达式
+    :param var: 指定的变量
+    :return:
+    """
+    if isinstance(exp, Variable):
+        return exp.symbol == var.symbol
+    elif isinstance(exp, Number):
+        return False
+    elif isinstance(exp, Sum):
+        return any([contains(e, var) for e in exp.exps])
+    elif isinstance(exp, Product):
+        return contains(exp.exp1, var) or contains(exp.exp2, var)
+    elif isinstance(exp, Power):
+        return contains(exp.base, var) or contains(exp.exponent, var)
+    elif isinstance(exp, Apply):
+        return contains(exp.argument, var)
+    else:
+        raise TypeError("Not a valid expression.")
+
+
+def distinct_functions(exp):
+    """
+    函数distinct_functions，接收一个表达式作为参数，并返回表达式中不重复的函数名(如sin或ln)
+    :param exp:表达式作为参数
+    :return:表达式中不重复的函数名(如sin或ln)
+    """
+    if isinstance(exp, Variable):
+        return set()
+    elif isinstance(exp, Number):
+        return set()
+    elif isinstance(exp, Sum):
+        return set().union(*[distinct_functions(exp) for exp in exp.exps])
+    elif isinstance(exp, Product):
+        return distinct_functions(exp.exp1).union(distinct_functions(exp.exp2))
+    elif isinstance(exp, Power):
+        return distinct_functions(exp.base).union(distinct_functions(exp.exponent))
+    elif isinstance(exp, Apply):
+        return set([exp.function.name]).union(distinct_functions(exp.argument))
+    else:
+        raise TypeError("Not a valid expression.")
+
+
+def contains_sum(exp):
+    """
+    函数contains_sum，接收一个表达式作为参数，如果表达式包含Sum就返回True，否则返回False
+    :param exp:
+    :return:
+    """
+    if isinstance(exp, Variable):
+        return False
+    elif isinstance(exp, Number):
+        return False
+    elif isinstance(exp, Sum):
+        return True
+    elif isinstance(exp, Product):
+        return contains_sum(exp.exp1) or contains_sum(exp.exp2)
+    elif isinstance(exp, Power):
+        return contains_sum(exp.base) or contains_sum(exp.exponent)
+    elif isinstance(exp, Apply):
+        return contains_sum(exp.argument)
+    else:
+        raise TypeError("Not a valid expression.")
+
+
 # 测试
 def f(x):
     return (3*x**2 + x) * math.sin(x)
@@ -311,20 +414,12 @@ Y = Variable('y')
 Z = Variable('z')
 A = Variable('a')
 B = Variable('b')
-print(Product(Sum(A, B), Sum(Y, Z)))
-print(Product(Sum(A, B), Sum(Y, Z)).expand())
+# print(Product(Sum(A, B), Sum(Y, Z)))
+# print(Product(Sum(A, B), Sum(Y, Z)).expand())
 # print(f_expression.expand())
 
-"""
-Traceback (most recent call last):
-  File "D:\PycharmProjects\Maths_test\Math_for_Programmers_master\u10_expressions.py", line 315, in <module>
-    print(Product(Sum(A, B), Sum(Y, Z)).expand())
-  File "D:\PycharmProjects\Maths_test\Math_for_Programmers_master\u10_expressions.py", line 32, in __repr__
-    return self.display()
-  File "D:\PycharmProjects\Maths_test\Math_for_Programmers_master\u10_expressions.py", line 95, in display
-    return "Product({}, {})".format(self.exp1.display(), self.exp2.display())
-AttributeError: 'function' object has no attribute 'display'
-"""
-
-
-
+# 测试 _python_expr()和 python_function
+test1 = Power(Variable("x"), Number(2))
+print(test1._python_expr())
+print(test1.python_function(x=3))
+print(test1.evaluate(x=3))
