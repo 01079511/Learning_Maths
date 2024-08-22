@@ -52,7 +52,7 @@ class Expressions(metaclass=ABCMeta):
         return eval(self._python_expr(), global_vars, bindings)
 
     @abstractmethod
-    def derevative(self, var):
+    def derivative(self, var):
         """
         对变量 var 求导数
         :param var: 变量
@@ -63,7 +63,7 @@ class Expressions(metaclass=ABCMeta):
     @abstractmethod
     def substitute(self, var, expression):
         """
-        2024.08.22 辅助Power.derevative()
+        2024.08.22 辅助Power.derivative()
         :param var:
         :param expression:
         :return:
@@ -157,10 +157,10 @@ class Product(Expressions):
     def substitute(self, var, exp):
         return Product(self.exp1.substitute(var, exp), self.exp2.substitute(var, exp))
 
-    def derevative(self, var):
+    def derivative(self, var):
         return  Sum(
-            Product(self.exp1.derevative(var), self.exp2),
-            Product(self.exp1, self.exp2.derevative(var))
+            Product(self.exp1.derivative(var), self.exp2),
+            Product(self.exp1, self.exp2.derivative(var))
         )
 
 
@@ -184,8 +184,8 @@ class Sum(Expressions):
     def _python_expr(self):
         return "+".join("({})".format(exp._python_expr()) for exp in self.exps)
 
-    def derevative(self, var):
-        return Sum(*[exp.derevative(var) for exp in self.exps])
+    def derivative(self, var):
+        return Sum(*[exp.derivative(var) for exp in self.exps])
 
     def substitute(self, var, new):
         return Sum(*[exp.substitute(var,new) for exp in self.exps])
@@ -226,14 +226,25 @@ class Quotient(Expressions):
     def evaluate(self, **bindings):
         return self.numerator.evaluate(**bindings) / self.denominator.evaluate(**bindings)
 
+    def expand(self):
+        return self
+
     def display(self):
         return "Quotient({},{})".format(self.numerator.display(), self.denominator.display())
 
-    def _python_expr(self):
-        return "({}) / ({})".format(self.exp1._python_expr(), self.exp2._python_expr())
-
     def substitute(self, var, exp):
         return Quotient(self.numerator.substitute(var, exp), self.denominator.substitute(var, exp))
+
+    def derivative(self, var):
+        return Quotient(
+            Difference(
+                Product(self.denominator, self.numerator.derivative(var)),
+                Product(self.numerator, self.denominator.derivative(var))
+            ),
+            Power(self.denominator,Number(2)))
+
+    def _python_expr(self):
+        return "({}) / ({})".format(self.exp1._python_expr(), self.exp2._python_expr())
 
 
 class Negative(Expressions):
@@ -278,7 +289,7 @@ class Number(Expressions):
     def _python_expr(self):
         return str(self.number)
 
-    def derevative(self, var):
+    def derivative(self, var):
         return Number(0)
 
     def substitute(self, var, exp):
@@ -313,7 +324,7 @@ class Variable(Expressions):
         else:
             return self
 
-    def derevative(self, var):
+    def derivative(self, var):
         """
         只有当一个变量是我们要进行导数计算的变量时，它的导数才是1，否则导数就是0,
         如果求f(x) = x的导数，结果是f'(x) = 1，对应的就是该直线的斜率。
