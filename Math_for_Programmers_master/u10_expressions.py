@@ -60,6 +60,16 @@ class Expressions(metaclass=ABCMeta):
         """
         pass
 
+    @abstractmethod
+    def substitute(self, var, expression):
+        """
+        2024.08.22 辅助Power.derevative()
+        :param var:
+        :param expression:
+        :return:
+        """
+        pass
+
 
 class Power(Expressions):
     """
@@ -83,6 +93,21 @@ class Power(Expressions):
 
     def _python_expr(self):
         return "({}) ** ({})".format(self.base._python_expr(), self.exponent._python_expr())
+
+    def substitute(self, var, exp):
+        return Power(self.base.substitute(var, exp), self.exponent.substitute(var, exp))
+
+    def derivative(self, var):
+        if isinstance(self.exponent, Number):  # 如果指数是一个数，使用幂法则
+            power_rule = Product(
+                    Number(self.exponent.number),
+                    Power(self.base, Number(self.exponent.number - 1)))
+            return Product(self.base.derivative(var), power_rule)  # f(x)**n的导数是f'(x) · nf(x)**n – 1，所以这里根据链式法则乘以f'(x)
+        elif isinstance(self.base, Number):  # 检查基数是否为数：如果是，我们使用指数法则
+            exponential_rule = Product(Apply(Function("ln"), Number(self.base.number)), self)
+            return Product(self.exponent.derivative(var), exponential_rule)  # 如果要求 a**f(x)的导数，那么同样根据链式法则，乘以f'(x)的系数
+        else:  # 当基数和指数都不是数时，会抛出一个异常
+            raise Exception("couldn't take derivative of power {}".format(self.display()))
 
 
 class Product(Expressions):
@@ -129,6 +154,9 @@ class Product(Expressions):
     def _python_expr(self):
         return "({})*({})".format(self.exp1._python_expr(), self.exp2._python_expr())
 
+    def substitute(self, var, exp):
+        return Product(self.exp1.substitute(var, exp), self.exp2.substitute(var, exp))
+
     def derevative(self, var):
         return  Sum(
             Product(self.exp1.derevative(var), self.exp2),
@@ -159,6 +187,9 @@ class Sum(Expressions):
     def derevative(self, var):
         return Sum(*[exp.derevative(var) for exp in self.exps])
 
+    def substitute(self, var, new):
+        return Sum(*[exp.substitute(var,new) for exp in self.exps])
+
 
 class Difference(Expressions):
     """
@@ -177,6 +208,9 @@ class Difference(Expressions):
 
     def _python_expr(self):
         return "({}) - ({})".format(self.exp1._python_expr(), self.exp2._python_expr())
+
+    def substitute(self, var, exp):
+        return Difference(self.exp1.substitute(var, exp), self.exp2.substitute(var, exp))
 
 
 class Quotient(Expressions):
@@ -198,6 +232,9 @@ class Quotient(Expressions):
     def _python_expr(self):
         return "({}) / ({})".format(self.exp1._python_expr(), self.exp2._python_expr())
 
+    def substitute(self, var, exp):
+        return Quotient(self.numerator.substitute(var, exp), self.denominator.substitute(var, exp))
+
 
 class Negative(Expressions):
     """
@@ -217,6 +254,9 @@ class Negative(Expressions):
 
     def _python_expr(self):
         return "- ({})".format(self.exp._python_expr())
+
+    def substitute(self,var,exp):
+        return Negative(self.exp.substitute(var,exp))
 
 
 class Number(Expressions):
@@ -241,6 +281,9 @@ class Number(Expressions):
     def derevative(self, var):
         return Number(0)
 
+    def substitute(self, var, exp):
+        return self
+
 
 class Variable(Expressions):
     """
@@ -263,6 +306,12 @@ class Variable(Expressions):
 
     def _python_expr(self):
         return self.symbol
+
+    def substitute(self, var, exp):
+        if self.symbol == var.symbol:
+            return exp
+        else:
+            return self
 
     def derevative(self, var):
         """
@@ -312,6 +361,13 @@ class Apply(Expressions):
     def _python_expr(self):
         return _function_python[self.function.name].format(self.argument._python_expr())
 
+    def substitute(self, var, exp):
+        return Apply(self.function, self.argument.substitute(var, exp))
+
+    def derivative(self, var):
+        return Product(
+                self.argument.derivative(var),
+                _derivatives[self.function.name].substitute(_var, self.argument))
 
 # 在Apply类上维护一个已知函数的字典数据, 单独_表示该部分是私有属性,不被from import引用
 _function_bindings = {
@@ -326,6 +382,17 @@ _function_python = {
     "cos": "math.cos({})",
     "ln": "math.log({})",
     "sqrt": "math.sqrt({})"
+}
+
+# 创建一个占位符，这样就不会与实际使用的其他符号(如x或y)混淆
+_var = Variable('placeholder variable')
+
+# 编码一些特殊函数的导数，它不能与我们在实践中使用的变量冲突。导数被存储为一个从函数名到其导数表达式的字典映射
+_derivatives = {
+    "sin": Apply(Function("cos"), _var),
+    "cos": Product(Number(-1), Apply(Function("sin"), _var)),
+    "ln": Quotient(Number(1), _var),
+    "sqrt": Quotient(Number(1), Product(Number(2), Apply(Function("sqrt"), _var)))
 }
 
 
@@ -473,3 +540,4 @@ eval() 函数将字符串 expression 解析为 Python 表达式，并在指定�
 """
 
 print(Product(Variable("c"), Variable("x")).derivative(Variable("x")))
+
