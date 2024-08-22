@@ -407,7 +407,7 @@ def f(x):
     return (3*x**2 + x) * math.sin(x)
 
 
-print("f(5) ={0},\nf_expression.evaluate(x=5) = {1}".format(f(5), f_expression.evaluate(x=5) ))
+# print("f(5) ={0},\nf_expression.evaluate(x=5) = {1}".format(f(5), f_expression.evaluate(x=5) ))
 
 # 测试 display()
 Y = Variable('y')
@@ -416,10 +416,24 @@ A = Variable('a')
 B = Variable('b')
 # print(Product(Sum(A, B), Sum(Y, Z)))
 # print(Product(Sum(A, B), Sum(Y, Z)).expand())
-# print(f_expression.expand())
+print(f_expression.expand())
 
-# 测试 _python_expr()和 python_function
+# 测试 _python_expr()和 python_function 效果对标evaluate()功能
 test1 = Power(Variable("x"), Number(2))
 print(test1._python_expr())
 print(test1.python_function(x=3))
 print(test1.evaluate(x=3))
+
+"""
+eval() 说明:
+eval() 函数用来执行一个字符串表达式，并返回表达式的值。
+语法:
+eval(expression[, globals[, locals]])
+参数:
+expression -- 表达式。
+globals -- 变量作用域，全局命名空间，如果被提供，则必须是一个字典对象。
+locals -- 变量作用域，局部命名空间，如果被提供，可以是任何映射对象。
+返回值:
+eval() 函数将字符串 expression 解析为 Python 表达式，并在指定的命名空间中执行它。
+注意点: eval() 函数会执行字符串内部的任何代码，风险点：恶意代码注入.
+"""
