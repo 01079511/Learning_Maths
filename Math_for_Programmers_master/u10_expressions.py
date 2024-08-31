@@ -1,6 +1,8 @@
 from abc import ABCMeta, abstractmethod
 import math
 
+from sympy import *
+
 
 class Expressions(metaclass=ABCMeta):
 
@@ -158,10 +160,19 @@ class Product(Expressions):
         return Product(self.exp1.substitute(var, exp), self.exp2.substitute(var, exp))
 
     def derivative(self, var):
-        return  Sum(
-            Product(self.exp1.derivative(var), self.exp2),
-            Product(self.exp1, self.exp2.derivative(var))
-        )
+        """
+        乘积法则,如果乘积是g(x) · h(x)，那么导数就是g'(x) · h(x) + g(x) · h'(x)
+        :param var:
+        :return:
+        """
+        if not contains(self.exp1, var):  # 如果第一个表达式没有依赖变量，则返回第一个表达式乘以第二个表达式的导数
+            return Product(self.exp1, self.exp2.derivative(var))
+        elif not contains(self.exp2, var):  # 如果第二个表达式没有依赖变量，则返回第一个表达式的导数乘以未修改的第二个表达式
+            return Product(self.exp1.derivative(var), self.exp2)
+        else:  # 否则，使用乘积法则的一般形式
+            return Sum(
+                Product(self.exp1.derivative(var), self.exp2),
+                    Product(self.exp1, self.exp2.derivative(var)))
 
 
 class Sum(Expressions):
@@ -376,9 +387,15 @@ class Apply(Expressions):
         return Apply(self.function, self.argument.substitute(var, exp))
 
     def derivative(self, var):
+        """
+        链式法则: g(h(x))的导数 = h'(x) · g'(h(x))
+        :param var:
+        :return:
+        """
         return Product(
-                self.argument.derivative(var),
-                _derivatives[self.function.name].substitute(_var, self.argument))
+                self.argument.derivative(var),  # 返回链式法则公式h'(x) · g'(h(x))中的 h'(x)
+                _derivatives[self.function.name].substitute(_var, self.argument))  # 链式法则公式的g'(h(x)),从_derivatives字典中查找g'和h(x)并插入。
+
 
 # 在Apply类上维护一个已知函数的字典数据, 单独_表示该部分是私有属性,不被from import引用
 _function_bindings = {
@@ -403,7 +420,7 @@ _derivatives = {
     "sin": Apply(Function("cos"), _var),
     "cos": Product(Number(-1), Apply(Function("sin"), _var)),
     "ln": Quotient(Number(1), _var),
-    "sqrt": Quotient(Number(1), Product(Number(2), Apply(Function("sqrt"), _var)))
+    "sqrt": Quotient(Number(1), Product(Number(2), Apply(Function("sqrt"), _var)))  # 1/2 * 1/(x**(1/2))
 }
 
 
@@ -550,5 +567,9 @@ eval() 函数将字符串 expression 解析为 Python 表达式，并在指定�
 注意点: eval() 函数会执行字符串内部的任何代码，风险点：恶意代码注入.
 """
 
-print(Product(Variable("c"), Variable("x")).derivative(Variable("x")))
+# print(Product(Variable("c"), Variable("x")).derivative(Variable("x")))
 
+# 通过Sympy库求积分表达式
+x = Symbol("x")
+# 求xcos(x)的积分: 这种将导数作为乘积的一个项，进行逆向工程的方法叫作分部积分法
+print((x * cos(x)).integrate(x))  # 如果书写请在 x*sin(x) + cos(x) 后面添加不定常熟C ==> x*sin(x) + cos(x) + C
