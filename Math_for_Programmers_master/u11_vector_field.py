@@ -44,7 +44,7 @@ def plot_scalar_field(f, xmin, xmax, ymin, ymax, xstep=0.25, ystep=0.25, c=None,
                       cmap=cm.coolwarm, alpha=1, antialiased=False):
     fig = plt.figure()
     fig.set_size_inches(7, 7)
-    ax = fig.gca(projection='3d')
+    ax = fig.add_subplot(111, projection='3d')
 
     fv = np.vectorize(f)
 
