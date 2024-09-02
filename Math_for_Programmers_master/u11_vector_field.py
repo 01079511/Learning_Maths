@@ -42,9 +42,13 @@ def plot_vector_field(f, xmin, xmax, ymin, ymax, xstep=1, ystep=1):
 
 def plot_scalar_field(f, xmin, xmax, ymin, ymax, xstep=0.25, ystep=0.25, c=None,
                       cmap=cm.coolwarm, alpha=1, antialiased=False):
+    """
+    plot_scalar_field 函数接收一个定义标量场的函数，以及x和y的边界，并绘制出代表该场的三维点的表面;
+    随着距离原点(0，0)越来越远，势能也会越来越大。在所有的径向方向上，图形的高度都会增加，即U值增大
+    """
     fig = plt.figure()
     fig.set_size_inches(7, 7)
-    ax = fig.add_subplot(111, projection='3d')
+    ax = fig.add_subplot(111, projection='3d')  # 使用add_subplot 创建3D轴对象,111表示1*1网格中第一个子图
 
     fv = np.vectorize(f)
 
@@ -59,9 +63,64 @@ def plot_scalar_field(f, xmin, xmax, ymin, ymax, xstep=0.25, ystep=0.25, c=None,
                            linewidth=0, antialiased=antialiased)
 
 
+def scalar_field_heatmap(f, xmin, xmax, ymin, ymax, xstep=0.1, ystep=0.1):
+    """
+    scalar_field_heatmap函数来绘制势能函数(热图)
+    靠近(0, 0)的地方，颜色较深，意味着U(x, y)的值较小。在图的边缘，颜色较浅，意味着U(x, y)的值较大
+    """
+    fig = plt.figure()
+    fig.set_size_inches(7, 7)
+
+    fv = np.vectorize(f)
+
+    X = np.arange(xmin, xmax, xstep)
+    Y = np.arange(ymin, ymax, ystep)
+    X, Y = np.meshgrid(X, Y)
+
+    # https://stackoverflow.com/a/54088910/1704140
+    z = fv(X, Y)
+
+    #     # x and y are bounds, so z should be the value *inside* those bounds.
+    #     # Therefore, remove the last value from the z array.
+    #     z = z[:-1, :-1]
+    #     z_min, z_max = -z.min(), z.max()
+
+    fig, ax = plt.subplots()
+
+    c = ax.pcolormesh(X, Y, z, cmap='plasma')
+    # set the limits of the plot to the limits of the data
+    ax.axis([X.min(), X.max(), Y.min(), Y.max()])
+    fig.colorbar(c, ax=ax)
+    plt.xlabel('x')
+    plt.ylabel('y')
+
+
+def scalar_field_contour(f, xmin, xmax, ymin, ymax, levels=None):
+    """
+    标量场绘制成等高线图,可以将其解释为U(x, y)在离原点越远的地方越陡峭
+    """
+    fv = np.vectorize(f)
+
+    X = np.arange(xmin, xmax, 0.1)
+    Y = np.arange(ymin, ymax, 0.1)
+    X, Y = np.meshgrid(X, Y)
+
+    # https://stackoverflow.com/a/54088910/1704140
+    Z = fv(X, Y)
+
+    fig, ax = plt.subplots()
+    CS = ax.contour(X, Y, Z, levels=levels)
+    ax.clabel(CS, inline=1, fontsize=10, fmt='%1.1f')
+    plt.xlabel('x')
+    plt.ylabel('y')
+    fig.set_size_inches(7, 7)
+
+
 # 从-5到5的范围,绘制函数f(x, y)的向量场
 # plot_vector_field(f, -5, 5, -5, 5)
-plot_scalar_field(u, -5, 5, -5, 5)
+# plot_scalar_field(u, -5, 5, -5, 5)
+# scalar_field_heatmap(u, -5, 5, -5, 5)
+scalar_field_contour(u, -10, 10, -10, 10, levels=[10, 20, 30, 40, 50, 60])
 
 # 显示调用plt.show()打开图形界面
 plt.show()
