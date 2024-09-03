@@ -357,8 +357,8 @@ def approx_gradient(f, x0, y0, dx=1e-6):
     :param dx:
     :return:
     """
-    partial_x = approx_derivative(lambda x: f(x,y0), x0, dx=dx)
-    partial_y = approx_derivative(lambda y: f(x0,y), y0, dx=dx)
+    partial_x = approx_derivative(lambda x: f(x, y0), x0, dx=dx)
+    partial_y = approx_derivative(lambda y: f(x0, y), y0, dx=dx)
     return partial_x, partial_y
 
 
@@ -371,7 +371,7 @@ def landing_distance_gradient(theta, phi):
     :param phi: ϕ
     :return:梯度
     """
-    return approx_gradient(landing_distance_gradient, theta, phi)
+    return approx_gradient(landing_distance, theta, phi)
 
 
 # 实现显示在r(θ, ϕ)热图上绘制的landing_distance_gradient的2个前置功能
@@ -393,6 +393,49 @@ def plot_vector_field(f, xmin, xmax, ymin, ymax, xsteps=10, ysteps=10, color='k'
     V = np.vectorize(lambda x, y: f(x, y)[1])(X, Y)
     plt.quiver(X, Y, U, V, color=color)
     fig = plt.gcf()
+
+
+# 实现梯度上升
+def gradient_ascent(f, xstart, ystart, tolerance=1e-6):
+    """
+,   梯度上升算法的输入是需要最大化的函数和一个起点位置,最终，当接近一个最大值时，梯度会随着图形到达一个高点而接近零
+    :param f:
+    :param xstart: 将(x, y)的初始值设置为输入值
+    :param ystart: 将(x, y)的初始值设置为输入值
+    :param tolerance: 容差(tolerance)当梯度接近零时，再也没有上坡路可走了，算法就此终止。通过容差，表示应该遵循的最小梯度值。如果梯度小于容差，就可以确保图形是平的，已经达到了函数的最大值
+    :return:
+    """
+    x = xstart
+    y = ystart
+    grad = approx_gradient(f, x, y)  # 告诉我们如何从当前(x, y)点处上坡
+    while length(grad) > tolerance:  # 仅当梯度大于容差时，才前进至新点
+        x += grad[0]  # 将(x, y)更新为(x, y) + ∇f(x, y）
+        y += grad[1]
+        grad = approx_gradient(f, x, y)  # 更新新点的梯度
+    return x, y  # 当无上坡路可走时,返回x和y的值
+
+
+def gradient_ascent_points(f, xstart, ystart, tolerance=1e-6):
+    """
+    了更好地了解 gradient_ascent()算法的工作原理，在θϕ平面上跟踪梯度上升的轨迹。
+    这与通过欧拉方法迭代跟踪时间和位置值的方式类似。
+    :param f:
+    :param xstart:
+    :param ystart:
+    :param tolerance:
+    :return:
+    """
+    x = xstart
+    y = ystart
+    xs, ys = [x], [y]
+    grad = approx_gradient(f,x,y)
+    while length(grad) > tolerance:
+        x += grad[0]
+        y += grad[1]
+        grad = approx_gradient(f,x,y)
+        xs.append(x)
+        ys.append(y)
+    return xs, ys
 
 
 # 各类测试
@@ -425,13 +468,34 @@ def plot_vector_field(f, xmin, xmax, ymin, ymax, xsteps=10, ysteps=10, color='k'
 # 射程函数的梯度图
 # plot_scalar_field(landing_distance,0,90,0,360)
 # 热图上绘制的landing_distance_gradient,在函数r(θ, ϕ)的热图上绘制梯度向量场∇r(θ, ϕ)。箭头指向r增加的方向，也就是热图上较亮的点
-scalar_field_heatmap(landing_distance, 0, 90, 0, 360)
-plot_vector_field(landing_distance_gradient, 0, 90, 0, 360, xsteps=10, ysteps=10, color='k')
-plt.xlabel('theta')
-plt.ylabel('phi')
-plt.gcf().set_size_inches(9, 7)
+# scalar_field_heatmap(landing_distance,0, 90, 0, 360)
+# plot_vector_field(landing_distance_gradient, 0, 90, 0, 360, xsteps=10, ysteps=10, color='k')
+# plt.xlabel('theta')
+# plt.ylabel('phi')
+# plt.gcf().set_size_inches(9, 7)
+# 通过更改输入方程(确保无递归),发现 plot_vector_field 功能不在问题,问题在原函数f中,landing_distance_gradient()书中内容有误
+# def f(x, y):
+#     return -2 * y, x
+# plot_vector_field(f, -5, 5,-5,5)
+# 在(θ, ϕ) = (37.5°, 90°)附近相同的图，这是其中一个最大值的近似位置
+# scalar_field_heatmap(landing_distance,35,40,80,100)
+# plot_vector_field(landing_distance_gradient,35,40,80,100,xsteps=10,ysteps=15,color='k')
+# plt.xlabel('theta')
+# plt.ylabel('phi')
+# plt.gcf().set_size_inches(9,7)
+# 在(θ, ϕ) = (36°, 83°)处测试一下gradient_ascent()功能
+# print(gradient_ascent(landing_distance, 36, 83))
+# 绘制梯度上升算法求出的射程函数最大值的路径,通过gradient_ascent_points()作为输入函数
+# scalar_field_heatmap(landing_distance,35,40,80,100)
+# plt.scatter([36,37.58114751557887],[83,89.99992616039857],c='k',s=75)
+# plt.plot(*gradient_ascent_points(landing_distance,36,83),c='k')
+# plt.xlabel('theta')
+# plt.ylabel('phi')
+# plt.gcf().set_size_inches(9,7)
+# 发射角(37.58°, 90°)和(37.58°, 270°)都能使函数 r(θ, ϕ)达到最大值，因此，这两个发射角都能使炮弹产生最大射程。该射程约为53米。
+# print(landing_distance(37.58114751557887, 89.99992616039857))
+
 # 显式调用图形窗口
 plt.show()
-
 
 
