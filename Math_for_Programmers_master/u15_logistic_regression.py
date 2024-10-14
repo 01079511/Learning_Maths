@@ -2,7 +2,7 @@ from u15_car_data import bmws, priuses
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import cm
-
+from math import exp, log
 """
 绘图函数部分
 """
@@ -35,9 +35,29 @@ def scalar_field_heatmap(f, xmin, xmax, ymin, ymax, xsteps=100, ysteps=100):
     fig.colorbar(c, ax=ax)
 
 
+def plot_scalar_field(f, xmin, xmax, ymin, ymax, xsteps=100, ysteps=100, c=None,
+                      cmap=cm.coolwarm, alpha=1,
+                      antialiased=False, zorder=0):
+    fig = plt.gcf()
+    fig.set_size_inches(7, 7)
+    ax = fig.add_subplot(111, projection='3d')  # 根据输入函数绘制三维坐标图
+
+    fv = np.vectorize(f)
+
+    # Make data.
+    X = np.linspace(xmin, xmax, xsteps)
+    Y = np.linspace(ymin, ymax, ysteps)
+    X, Y = np.meshgrid(X, Y)
+    Z = fv(X, Y)
+
+    # Plot the surface.
+    surf = ax.plot_surface(X, Y, Z, cmap=cmap, color=c, alpha=alpha,
+                           linewidth=0, antialiased=antialiased, zorder=zorder)
+
+
 def plot_data(ds):
     """
-     plot_data 辅助函数将获取整个汽车数据列表，并用×代表宝马，用圆点代表普锐斯
+    plot_data 辅助函数将获取整个汽车数据列表，并用×代表宝马，用圆点代表普锐斯
     :param ds:
     :return:
     """
@@ -184,6 +204,79 @@ def make_scale(data):
 price_scale, price_unscale = make_scale([x[1] for x in all_car_data])  # 返回两套函数，一套用于价格，一套用于里程数
 mileage_scale, mileage_unscale = make_scale([x[0] for x in all_car_data])
 
+
+def sigmoid(x):
+    """
+    最基本的logistic函数如下，通常称为sigmoid函数: σ(x) = 1 / 1 + e**(-x)
+    :param x:
+    :return:
+    """
+    return 1 / (1+exp(-x))
+
+
+def f(x, p):
+    """
+    f(x, p) = p − ax − b, 返回值可能很大，可能是正数，也可能是负数。0表示它处于宝马和普锐斯之间的边界上
+    :param x:里程值
+    :param p:价格值
+    :return:返回一个数，该数衡量这些值在多大程度上更像宝马而不是普锐斯
+    """
+    return p + 0.35 * x - 0.56
+
+
+def l(x, p):
+    """
+    要将 f(x, p)的输出调整到预期范围内，只需通过sigmoid函数 σ(x)即可。
+    就是说，我们要的函数是 σ(f(x, p)),
+    目的: 用L(x, p)这样的函数来拟合数据
+    :param x: 里程数
+    :param p: 价格
+    :return:
+    """
+    return sigmoid(f(x, p))
+
+
+def make_logistic(a, b, c):
+    """
+    二维的logistic函数:
+    :param a:
+    :param b:
+    :param c:
+    :return: 相应的 logistic函数 L(x, p) = σ(ax + bp − c)
+    """
+    def l(x, p):
+        return sigmoid(a*x + b*p - c)
+    return l
+
+
+def simple_logistic_cost(a, b, c):
+    """
+    代价函数: 衡量函数L的误差或代价，一个简单的方法是找出它与正确值（0或1）之间的误差。
+    如果把所有误差加起来，得到的总值就表明函数L(x, p)与数据集的差距,
+    这个代价函数很好地报告了误差，但不足以使梯度下降收敛到a、b和c的最佳值。
+    :param a:
+    :param b:
+    :param c:
+    :return:
+    """
+    l = make_logistic(a, b, c)
+    errors = [abs(is_bmw-l(x, p))
+              for x, p, is_bmw in scaled_car_data]
+    return sum(errors)
+
+
+def point_cost(l, x, p, is_bmw):
+    """
+    待理解2024.09.16
+    :param l:
+    :param x:
+    :param p:
+    :param is_bmw:
+    :return:
+    """
+    wrong = 1 - is_bmw
+    return -log(abs(wrong - l(x,p)))
+
 """
 测试部分
 """
@@ -212,7 +305,29 @@ if __name__ == "__main__":
     # 里程和价格数据按比例缩放，使所有数值都在0和1之间。该图看起来和以前一样，但数值误差风险降低了
     scaled_car_data = [(mileage_scale(mileage), price_scale(price), is_bmw)
                        for mileage, price, is_bmw in all_car_data]
-    plot_data(scaled_car_data)
+    # plot_data(scaled_car_data)
+
+    # 查看带有数据的f(x, p) = p − ax − b的热力图（见图15-9）。当a = –0.35、b = 0.56时，函数为f(x, p) = p− 0.35 · x − 0.56
+    # 热图和决策边界图，展示出亮值（正“宝马性”）位于决策边界之上，暗值（负“宝马性”）位于决策边界之下
+    # scalar_field_heatmap(lambda x, p: p + 0.35 * x - 0.56, 0, 1, 0, 1)
+    # plt.ylabel('Price', fontsize=16)
+    # plt.xlabel('Mileage', fontsize=16)
+    # plot_function(lambda x: 0.56 - 0.35 * x, 0, 1, c='k')
+
+    # sigmoid函数σ(x)的曲线图
+    # plot_function(sigmoid, -5, 5)
+
+    # 函数L(x, p)的值 和 f(x, p)的值对比二维图
+    # scalar_field_heatmap(l, 0, 1, 0, 1)
+    # # plot_data(scaled_car_data,white=True)
+    # plt.ylabel('Price', fontsize=16)
+    # plt.xlabel('Mileage', fontsize=16)
+    # plot_function(lambda x: 0.56 - 0.35 * x, 0, 1, c='k')
+    # 函数 f(x, p)的值三维图
+    plot_scalar_field(l, -5, 5, -5, 5)
+    # 函数 L(x, p)的值三维图
+    plot_scalar_field(f, -5, 5, -5, 5)
+    # 结论:如果用0或1表示汽车的类型,那么函数L(x, p)的值实际上会接近这些数，而f(x, p)的值则会走向正无穷和负无穷
 
     # 显式调用图形界面
     plt.show()
