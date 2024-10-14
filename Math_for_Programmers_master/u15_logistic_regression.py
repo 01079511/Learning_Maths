@@ -151,7 +151,7 @@ def test_classifier(classifier, data, verbose=False):
     """
     测试分类函数: 衡量分类器算法的效果,传入分类器效果,和测试数据集,返回分类器可以正确识别多少辆汽车,从而评估分类器的效果,并且打印真阳性、真阴性、假阳性和假阴性的数量
     :param classifier:  一个分类函数（比如bmw_finder）
-    :param data:  一个用于测试的数据集
+    :param data: 一个用于测试的数据集
     :param verbose: 指定是否打印数据(默认是不打印)
     :return: 一个百分比值，表明可以正确识别多少辆汽车
     """
