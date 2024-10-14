@@ -275,7 +275,7 @@ def point_cost(l, x, p, is_bmw):
     :return:
     """
     wrong = 1 - is_bmw
-    return -log(abs(wrong - l(x,p)))
+    return -log(abs(wrong - l(x, p)))
 
 
 """
