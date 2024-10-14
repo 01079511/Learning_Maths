@@ -277,6 +277,7 @@ def point_cost(l, x, p, is_bmw):
     wrong = 1 - is_bmw
     return -log(abs(wrong - l(x,p)))
 
+
 """
 测试部分
 """
