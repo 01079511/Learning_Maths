@@ -131,6 +131,6 @@ if __name__ == "__main__":
 
     # 批量分析
     stock_list = ['000702.SZ', '002449.SZ']
-    results = analyzer.batch_analyze(stock_list, '20241109')
+    results = analyzer.batch_analyze(stock_list, '20241108')
     print("\n批量分析结果:")
     print(results)
