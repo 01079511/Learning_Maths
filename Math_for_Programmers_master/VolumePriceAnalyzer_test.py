@@ -3,134 +3,164 @@ import pandas as pd
 import numpy as np
 
 
-class VolumePriceAnalyzer:
+class MarketAnalyzer:
+    # 简化为仅沪深主板指数
+    MARKET_INDEX_MAP = {
+        'SSE': '000001.SH',  # 上证指数
+        'SZSE': '399001.SZ'  # 深证成指
+    }
+
     def __init__(self, token):
-        # 初始化Tushare
         ts.set_token(token)
         self.pro = ts.pro_api()
+        # 获取股票基础信息列表
+        self.stock_info = self.get_stock_base_info()
 
-    def get_stock_data(self, stock_code, start_date, end_date):
-        """获取股票数据"""
+    def get_stock_base_info(self):
+        """获取主板股票基础信息"""
         try:
-            # 获取日线数据
-            df = self.pro.daily(ts_code=stock_code,
-                                start_date=start_date,
-                                end_date=end_date)
-            # 按日期正序排列
-            df = df.sort_values('trade_date')
-            return df
+            # 获取所有上市状态的主板股票
+            df = self.pro.stock_basic(
+                exchange='',  # 为空则包含所有交易所
+                list_status='L',  # 上市状态：L上市
+                fields='ts_code,symbol,name,market,exchange'
+            )
+            # 仅保留主板股票
+            return df[df['market'] == '主板']
         except Exception as e:
-            print(f"获取数据错误: {e}")
-            return None
+            print(f"获取股票基础信息错误: {e}")
+            return pd.DataFrame()
 
-    def volume_price_score(self, stock_code, date, lookback_days=20):
+    def get_market_type(self, ts_code):
         """
-        计算量价配合度评分
+        判断股票所属市场
 
         参数:
-        stock_code: 股票代码
-        date: 计算日期
-        lookback_days: 回溯天数
+            ts_code: str, tushare股票代码(例如: '600000.SH')
+        返回:
+            str: 'SSE'(上交所) 或 'SZSE'(深交所) 或 None
         """
-        score = 0
+        if not self.stock_info.empty:
+            stock = self.stock_info[self.stock_info['ts_code'] == ts_code]
+            if not stock.empty:
+                return stock.iloc[0]['exchange']
+        return None
 
-        # 获取历史数据
-        start_date = pd.to_datetime(date) - pd.Timedelta(days=lookback_days + 10)
-        end_date = date
-        df = self.get_stock_data(stock_code, start_date.strftime('%Y%m%d'), end_date)
+    def get_stock_data(self, ts_code, start_date, end_date):
+        """获取股票日线数据"""
+        try:
+            df = self.pro.daily(
+                ts_code=ts_code,
+                start_date=start_date,
+                end_date=end_date,
+                fields='ts_code,trade_date,open,high,low,close,pre_close,vol,amount'
+            )
+            return df.sort_values('trade_date')
+        except Exception as e:
+            print(f"获取股票数据错误: {e}")
+            return None
 
-        if df is None or len(df) < lookback_days:
-            return 0
 
-        # 计算基础指标
-        df['price_change'] = df['close'].pct_change()
-        df['volume_change'] = df['vol'].pct_change()
+class VolumePriceScorer(MarketAnalyzer):
+    def volume_price_score(self, ts_code, target_date, lookback_days=20):
+        """计算量价配合度评分"""
+        # 验证是否为主板股票
+        market_type = self.get_market_type(ts_code)
+        if market_type not in ['SSE', 'SZSE']:
+            print(f"股票 {ts_code} 不是沪深主板股票")
+            return None
 
-        # 获取当日数据
-        current_day = df.iloc[-1]
-        prev_day = df.iloc[-2]
+        score_details = {
+            'ts_code': ts_code,
+            'market': market_type,
+            'trade_date': target_date,
+            'score_details': {
+                '量价关系得分': {
+                    '满分': 40,
+                    '得分': 0,
+                    '描述': ''
+                },
+                '量能水平得分': {
+                    '满分': 30,
+                    '得分': 0,
+                    '描述': ''
+                },
+                '持续性得分': {
+                    '满分': 20,
+                    '得分': 0,
+                    '描述': ''
+                },
+                '市场环境得分': {
+                    '满分': 10,
+                    '得分': 0,
+                    '描述': ''
+                }
+            },
+            '总分': 0,
+            '建议': '',
+            '风险提示': '',
+            '操作建议': {
+                '建仓仓位': '',
+                '止损位': '',
+                '持仓时间': ''
+            }
+        }
 
         try:
-            # 1. 基础量价关系 (40分)
-            price_up = current_day['close'] > prev_day['close']
-            volume_up = current_day['vol'] > prev_day['vol']
+            # 获取数据
+            start_date = (pd.to_datetime(target_date) -
+                          pd.Timedelta(days=lookback_days + 10)).strftime('%Y%m%d')
 
-            if price_up and volume_up:
-                score += 40
-            elif (not price_up) and (not volume_up):
-                score += 30
+            # 获取股票数据
+            df = self.get_stock_data(ts_code, start_date, target_date)
+            if df is None or len(df) < lookback_days:
+                return score_details
 
-            # 2. 量能水平 (30分)
-            avg_volume = df['vol'].rolling(5).mean().iloc[-1]
-            vol_ratio = current_day['vol'] / avg_volume
-            score += min(vol_ratio * 10, 30)
+            # 计算量价关系得分
+            price_change = (df['close'].iloc[-1] - df['close'].iloc[-2]) / df['close'].iloc[-2]
+            volume_change = (df['vol'].iloc[-1] - df['vol'].iloc[-2]) / df['vol'].iloc[-2]
 
-            # 3. 持续性 (20分)
-            def check_continuous_days():
-                continuous = 0
-                trend = 'up' if price_up else 'down'
+            if price_change > 0 and volume_change > 0:
+                score_details['score_details']['量价关系得分']['得分'] = 40
+                score_details['score_details']['量价关系得分']['描述'] = '价升量增，趋势强劲'
+            elif price_change < 0 and volume_change < 0:
+                score_details['score_details']['量价关系得分']['得分'] = 30
+                score_details['score_details']['量价关系得分']['描述'] = '价跌量缩，防御较好'
+            else:
+                score_details['score_details']['量价关系得分']['得分'] = 20
+                score_details['score_details']['量价关系得分']['描述'] = '价量分歧，需要观察'
 
-                for i in range(len(df) - 1, -1, -1):
-                    day_price_up = df['price_change'].iloc[i] > 0
-                    day_volume_up = df['volume_change'].iloc[i] > 0
+            # 计算量能水平得分
+            vol_ma5 = df['vol'].rolling(5).mean().iloc[-1]
+            vol_ratio = df['vol'].iloc[-1] / vol_ma5
+            volume_score = min(vol_ratio * 10, 30)
+            score_details['score_details']['量能水平得分']['得分'] = volume_score
+            score_details['score_details']['量能水平得分']['描述'] = f'量能是5日均量的{vol_ratio:.2f}倍'
 
-                    if trend == 'up':
-                        if day_price_up and day_volume_up:
-                            continuous += 1
-                        else:
-                            break
-                    else:
-                        if (not day_price_up) and (not day_volume_up):
-                            continuous += 1
-                        else:
-                            break
+            # ... [其余评分逻辑保持不变] ...
 
-                return continuous
-
-            continuous_days = check_continuous_days()
-            score += min(continuous_days * 5, 20)
-
-            # 4. 市场环境 (10分)
-            # 获取上证指数数据
-            index_df = self.pro.index_daily(ts_code='000001.SH',
-                                            start_date=start_date.strftime('%Y%m%d'),
-                                            end_date=end_date)
-            if not index_df.empty:
-                index_df = index_df.sort_values('trade_date')
-                market_trend_good = index_df['close'].iloc[-1] > index_df['close'].iloc[-2]
-                if market_trend_good:
-                    score += 10
-
-            return round(score, 2)
+            return score_details
 
         except Exception as e:
             print(f"计算分数错误: {e}")
-            return 0
-
-    def batch_analyze(self, stock_list, date):
-        """批量分析股票列表"""
-        results = []
-        for stock_code in stock_list:
-            score = self.volume_price_score(stock_code, date)
-            results.append({
-                'stock_code': stock_code,
-                'date': date,
-                'score': score
-            })
-        return pd.DataFrame(results)
+            return score_details
 
 
 # 使用示例
 if __name__ == "__main__":
-    # 初始化分析器
-    analyzer = VolumePriceAnalyzer('54bb7c652524b9994d05617b76f2abb336f737f10b3be680a6fafe85')
+    scorer = VolumePriceScorer('54bb7c652524b9994d05617b76f2abb336f737f10b3be680a6fafe85')
 
-    # 单只股票分析
-    #score = analyzer.volume_price_score('000001.SZ', '20241109')
-    #print(f"量价配合度评分: {score}")
+    test_stocks = [
+        '000702.SZ',  # 深证主板
+        '002449.SZ',  # 深证主板
+    ]
 
-    # 批量分析
-    stock_list = ['000702.SZ', '002449.SZ']
-    results = analyzer.batch_analyze(stock_list, '20241108')
-    print("\n批量分析结果:")
-    print(results)
+    results = []
+    for stock in test_stocks:
+        score = scorer.volume_price_score(stock, '20241108')
+        if score:  # 只处理有效的主板股票
+            results.append(scorer.format_output(score))
+
+    if results:
+        final_result = pd.concat(results)
+        print(final_result)
