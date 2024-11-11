@@ -448,8 +448,8 @@ if __name__ == "__main__":
     scorer = VolumePriceScorer()
 
     # 直接提供股票代码和日期
-    stock_code = '300353'  # 股票代码
-    target_date = None  # 分析日期,None调用实时数据，过去日期可用于回测
+    stock_code = '600269'  # 股票代码
+    target_date = '20241111'  # 分析日期,None调用实时数据，过去日期可用于回测
 
     # 获取评分
     score = scorer.calculate_score(stock_code, target_date)
