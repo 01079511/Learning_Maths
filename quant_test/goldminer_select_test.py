@@ -1,232 +1,275 @@
-# coding=utf-8
-from __future__ import print_function, absolute_import
 from gm.api import *
-import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
-import statsmodels.api as sm
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import TimeSeriesSplit
-from scipy import stats
-import xgboost as xgb
-import talib
-from sklearn.calibration import CalibratedClassifierCV
 
-# 全局参数
-TRAIN_WINDOW = 180  # 训练窗口(6个月)
-PREDICT_WINDOW = 15  # 预测窗口(15天)
-ROLLING_STEP = 15  # 滚动步长
-MIN_SAMPLES = 120  # 最小样本量要求
+# 配置常量
+PRICE_TOLERANCE = 0.005  # 价格相等的容差
+MIN_SHADOW = 0.01       # 影线最小长度
+MAX_SHADOW = 0.03       # 影线最大长度
 
-# 测试股票池
-TEST_STOCKS = ['SHSE.600000', 'SHSE.601318']  # 浦发银行和中国平安
+# 推荐标准阈值
+T_PATTERN_THRESHOLD = 0.20      # T型K线总占比阈值
+MORNING_T_THRESHOLD = 0.10      # 早盘T型K线占比阈值
+CONTINUOUS_WINDOW = 15          # 连续性检测窗口(分钟)
+MAX_CONTINUOUS_WINDOWS = 2      # 允许的最大连续窗口数
 
+def is_price_equal(price1, price2):
+    """判断两个价格是否相等(考虑精度)"""
+    return abs(price1 - price2) <= PRICE_TOLERANCE
 
-def calculate_features(stock_data):
-    """计算技术指标特征"""
-    if len(stock_data) < MIN_SAMPLES:
-        print(f"数据样本量不足: {len(stock_data)} < {MIN_SAMPLES}")
+def is_t_pattern(row):
+    """判断是否为T字或倒T字形态"""
+    open_price = row['open']
+    close_price = row['close']
+    high_price = row['high']
+    low_price = row['low']
+    
+    # 检查开盘价和收盘价是否相等
+    if not is_price_equal(open_price, close_price):
         return None
+    
+    # T字形态：开盘=收盘=最低价，有合适长度的上影线
+    if (is_price_equal(open_price, low_price) and 
+        high_price > open_price):
+        shadow_length = high_price - open_price
+        if MIN_SHADOW - PRICE_TOLERANCE <= shadow_length <= MAX_SHADOW + PRICE_TOLERANCE:
+            return 'T字形'
+    
+    # 倒T字形态：开盘=收盘=最高价，有合适长度的下影线
+    if (is_price_equal(open_price, high_price) and 
+        low_price < open_price):
+        shadow_length = open_price - low_price
+        if MIN_SHADOW - PRICE_TOLERANCE <= shadow_length <= MAX_SHADOW + PRICE_TOLERANCE:
+            return '倒T字形'
+    
+    return None
 
+def analyze_continuous_patterns(data, window_size=CONTINUOUS_WINDOW):
+    """分析连续T型K线"""
+    windows = []
+    current_window = []
+    last_pattern_time = None
+    
+    for idx, row in data.iterrows():
+        if row['is_t_pattern']:
+            current_time = pd.to_datetime(row['eob'])
+            
+            if last_pattern_time is None:
+                current_window = [current_time]
+            else:
+                time_diff = (current_time - last_pattern_time).total_seconds() / 60
+                if time_diff <= window_size:
+                    current_window.append(current_time)
+                else:
+                    if len(current_window) > 1:
+                        windows.append(current_window)
+                    current_window = [current_time]
+            
+            last_pattern_time = current_time
+    
+    if len(current_window) > 1:
+        windows.append(current_window)
+        
+    return len(windows)  # 返回连续窗口数量
+
+# 推荐标准阈值
+T_PATTERN_THRESHOLD_L1 = 0.15    # Level 1的全天T型占比阈值(15%)
+T_PATTERN_THRESHOLD_L2 = 0.20    # Level 2的全天T型占比阈值(20%)
+MORNING_T_THRESHOLD_L1 = 0.08    # Level 1的早盘T型占比阈值(8%)
+MORNING_T_THRESHOLD_L2 = 0.10    # Level 2的早盘T型占比阈值(10%)
+CONTINUOUS_WINDOWS_L1 = 3        # Level 1的连续窗口阈值
+CONTINUOUS_WINDOWS_L2 = 6        # Level 2的连续窗口阈值
+
+def evaluate_stock(total_ratio, morning_ratio, continuous_windows):
+    """评估股票是否推荐
+    
+    Level 1 (推荐使用):
+    - 早盘T型占比 < 8%
+    - 全天T型占比 < 15%
+    - 连续性窗口 ≤ 3
+    
+    Level 2 (观察使用):
+    - 早盘T型占比 8-10%
+    - 全天T型占比 15-20%
+    - 连续性窗口 ≤ 6
+    
+    Level 3 (不推荐使用):
+    - 超出以上任一标准
+    """
+    # Level 3 判定（任一指标超标）
+    if (total_ratio > T_PATTERN_THRESHOLD_L2 or 
+        morning_ratio > MORNING_T_THRESHOLD_L2 or 
+        continuous_windows > CONTINUOUS_WINDOWS_L2):
+        return 3, "不推荐：指标超出可接受范围"
+    
+    # Level 1 判定（所有指标都在最优范围）
+    if (total_ratio < T_PATTERN_THRESHOLD_L1 and 
+        morning_ratio < MORNING_T_THRESHOLD_L1 and 
+        continuous_windows <= CONTINUOUS_WINDOWS_L1):
+        return 1, "推荐：所有指标都在理想范围内"
+    
+    # Level 2 判定（介于Level 1和Level 3之间）
+    return 2, "观察：指标在临界范围内"
+
+def analyze_t_patterns(context, symbol):
+    """分析T字形态并生成统计报告"""
     try:
-        df = pd.DataFrame()
-        # 转换数据类型为float
-        close = stock_data['close'].astype(float).values
-        high = stock_data['high'].astype(float).values
-        low = stock_data['low'].astype(float).values
-        volume = stock_data['volume'].astype(float).values
-
-        # 趋势指标
-        df['ma5'] = talib.MA(close, timeperiod=5)
-        df['ma10'] = talib.MA(close, timeperiod=10)
-        df['ma20'] = talib.MA(close, timeperiod=20)
-
-        # 动量指标
-        df['rsi'] = talib.RSI(close)
-        macd, signal, hist = talib.MACD(close)
-        df['macd'] = macd
-        df['macd_signal'] = signal
-        df['macd_hist'] = hist
-
-        # KDJ指标
-        k, d = talib.STOCH(high, low, close)
-        df['kdj_k'] = k
-        df['kdj_d'] = d
-        df['kdj_j'] = 3 * k - 2 * d
-
-        # 波动率指标
-        df['atr'] = talib.ATR(high, low, close)
-        df['volatility'] = pd.Series(close).pct_change().rolling(window=20).std()
-
-        # 成交量指标
-        df['volume_ma5'] = talib.MA(volume, timeperiod=5)
-        df['volume_ma20'] = talib.MA(volume, timeperiod=20)
-
-        df.index = stock_data.index
-        df = df.dropna()
-
-        print(f"特征计算完成, shape={df.shape}")
-        return df
-
-    except Exception as e:
-        print(f"特征计算错误: {e}")
-        return None
-
-
-def get_market_features():
-    """获取市场特征数据"""
-    try:
-        index_data = history_n(symbol='SHSE.000001', frequency='1d',
-                               count=TRAIN_WINDOW, fields='close,volume', df=True)
-
-        if index_data is None or len(index_data) < MIN_SAMPLES:
-            print("市场数据获取失败或样本量不足")
+        # 获取最近5个交易日
+        current_date = datetime.now()
+        end_date = current_date
+        start_date = current_date - timedelta(days=5)
+        
+        # 获取1分钟K线数据
+        data = history(symbol=symbol,
+                      frequency='60s',
+                      start_time=start_date,
+                      end_time=end_date,
+                      fields='eob,open,high,low,close,volume',
+                      df=True)
+        
+        if data.empty:
+            print(f"{symbol} 未获取到数据")
             return None
-
-        features = pd.DataFrame()
-        features['market_return'] = index_data['close'].pct_change()
-        features['market_vol'] = features['market_return'].rolling(20).std()
-        features['market_volume'] = index_data['volume'].pct_change()
-
-        features.index = index_data.index
-        features = features.dropna()
-
-        print(f"市场特征计算完成, shape={features.shape}")
-        return features
-
+            
+        # 获取股票名称 (修改为使用get_symbol_infos)    
+        stock_info = get_symbol_infos(
+            sec_type1=1010,  # 股票类型
+            symbols=symbol,
+            df=True
+        )
+        stock_name = stock_info.iloc[0]['sec_name'] if not stock_info.empty else symbol
+        
+        # 添加日期时间列
+        data['date'] = pd.to_datetime(data['eob']).dt.date
+        data['time'] = pd.to_datetime(data['eob']).dt.strftime('%H:%M:%S')
+        
+        # 判断形态
+        data['pattern_type'] = data.apply(is_t_pattern, axis=1)
+        data['is_t_pattern'] = data['pattern_type'].notna()
+        
+        # 计算连续性指标
+        continuous_windows = analyze_continuous_patterns(data)
+        
+        # 生成汇总统计
+        generate_summary_csv(data, stock_name, start_date.date(), end_date.date(), continuous_windows)
+        
+        # 生成最新一天详细数据
+        generate_detail_csv(data, stock_name)
+        
+        print(f"已完成{stock_name}的T字形态分析")
+        return True
+        
     except Exception as e:
-        print(f"市场特征计算错误: {e}")
+        print(f"分析过程错误: {e}")
         return None
 
-
-def train_model(stock_data, market_features=None):
-    """训练模型"""
+def generate_summary_csv(data, stock_name, start_date, end_date, continuous_windows):
+    """生成汇总统计CSV"""
     try:
-        # 计算个股特征
-        stock_features = calculate_features(stock_data)
-        if stock_features is None:
-            return None, None
-
-        # 生成标签
-        future_returns = stock_data['close'].pct_change(PREDICT_WINDOW).shift(-PREDICT_WINDOW)
-        labels = (future_returns > 0).astype(int)
-
-        # 对齐数据
-        common_index = stock_features.index.intersection(labels.index[:-PREDICT_WINDOW])
-        stock_features = stock_features.loc[common_index]
-        labels = labels.loc[common_index]
-
-        # 合并市场特征
-        if market_features is not None:
-            market_features = market_features.reindex(common_index)
-            features = pd.concat([stock_features, market_features], axis=1)
-        else:
-            features = stock_features
-
-        # 删除含有NaN的行
-        valid_mask = features.notna().all(axis=1)
-        features = features[valid_mask]
-        labels = labels[valid_mask]
-
-        if len(features) < MIN_SAMPLES:
-            print(f"有效样本数{len(features)}小于最小要求{MIN_SAMPLES}")
-            return None, None
-
-        # 特征标准化
-        scaler = StandardScaler()
-        X = scaler.fit_transform(features)
-        y = labels.values
-
-        # XGBoost模型
-        base_model = xgb.XGBClassifier(
-            max_depth=3,
-            learning_rate=0.1,
-            n_estimators=100,
-            scale_pos_weight=1
-        )
-
-        # 概率校准
-        model = CalibratedClassifierCV(base_model, cv=5)
-        model.fit(X, y)
-
-        print(f"模型训练完成: 特征shape={X.shape}, 标签shape={y.shape}")
-        return model, scaler
-
+        # 按天统计
+        daily_stats = []
+        
+        for date, group in data.groupby('date'):
+            # 计算全天统计
+            total_klines = len(group)
+            total_t_patterns = group['is_t_pattern'].sum()
+            total_ratio = (total_t_patterns / total_klines * 100) if total_klines > 0 else 0
+            
+            # 计算早盘统计（9:30-10:30）
+            morning_data = group[group['time'].between('09:30:00', '10:30:00')]
+            morning_klines = len(morning_data)
+            morning_t_patterns = morning_data['is_t_pattern'].sum()
+            morning_ratio = (morning_t_patterns / morning_klines * 100) if morning_klines > 0 else 0
+            
+            # 评估推荐等级
+            level, reason = evaluate_stock(total_ratio, morning_ratio, continuous_windows)
+            
+            daily_stats.append({
+                '股票名称': stock_name,
+                '日期': date,
+                '当日1分钟K线数': total_klines,
+                'T字型态数': total_t_patterns,
+                '全天占比': round(total_ratio, 2),
+                '早盘占比': round(morning_ratio, 2),
+                '连续窗口数': continuous_windows,
+                '推荐等级': level,
+                '评估结果': reason
+            })
+        
+        if not daily_stats:
+            print("无统计数据")
+            return
+            
+        # 转换为DataFrame
+        df_stats = pd.DataFrame(daily_stats)
+        
+        # 保存文件
+        filename = f'T形态汇总统计_{start_date}_{end_date}.csv'
+        df_stats.to_csv(filename, index=False, encoding='utf-8-sig')
+        print(f"已生成汇总文件: {filename}")
+        
     except Exception as e:
-        print(f"模型训练错误: {e}")
-        return None, None
+        print(f"生成汇总统计错误: {e}")
 
-
-def evaluate_model(context, stock):
-    """评估单个股票模型"""
+def generate_detail_csv(data, stock_name):
+    """生成最近一天详细数据CSV"""
     try:
-        if stock not in context.models:
-            print(f"{stock}模型不存在")
+        # 获取最新日期
+        latest_date = data['date'].max()
+        
+        # 筛选最新日期且为T字形态的数据
+        latest_data = data[
+            (data['date'] == latest_date) & 
+            (data['pattern_type'].notna())
+        ][['time', 'pattern_type', 'open', 'high', 'low', 'close']]
+        
+        if latest_data.empty:
+            print("无详细数据")
             return
-
-        test_data = history_n(symbol=stock, frequency='1d', count=30,
-                              fields='symbol,eob,open,close,high,low,volume', df=True)
-
-        features = calculate_features(test_data)
-        if features is None:
-            return
-
-        X = context.scalers[stock].transform(features)
-        probs = context.models[stock].predict_proba(X)
-
-        print(f"\n{stock} 预测结果:")
-        print("最近5天上涨概率:", probs[-5:, 1])
-
-        # 计算实际涨跌
-        returns = test_data['close'].pct_change()
-        print("实际涨跌:", returns[-6:-1].values)
-
+            
+        # 生成文件名
+        filename = f'T形态详细数据_{latest_date}.csv'
+        
+        # 保存文件
+        latest_data.to_csv(filename, index=False, encoding='utf-8-sig')
+        print(f"已生成详细文件: {filename}")
+        
     except Exception as e:
-        print(f"模型评估错误: {e}")
-
+        print(f"生成详细数据错误: {e}")
 
 def init(context):
-    """初始化策略"""
-    print("开始初始化策略...")
+    """策略初始化函数"""
+    try:
+        # 设置分析参数
+        context.T_PATTERN_THRESHOLD_L1 = 0.15
+        context.T_PATTERN_THRESHOLD_L2 = 0.20
+        context.MORNING_T_THRESHOLD_L1 = 0.08
+        context.MORNING_T_THRESHOLD_L2 = 0.10
+        context.CONTINUOUS_WINDOWS_L1 = 3
+        context.CONTINUOUS_WINDOWS_L2 = 6
 
-    # 设置测试股票池
-    context.stock_pool = TEST_STOCKS
-    context.models = {}
-    context.scalers = {}
-
-    # 获取市场特征
-    context.market_features = get_market_features()
-
-    # 训练测试股票的模型
-    for stock in context.stock_pool:
-        print(f"\n处理股票: {stock}")
-        stock_data = history_n(symbol=stock, frequency='1d', count=TRAIN_WINDOW,
-                               fields='symbol,eob,open,close,high,low,volume', df=True)
-
-        if stock_data is None:
-            print(f"{stock} 无数据")
-            continue
-
-        print(f"获取数据 shape={stock_data.shape}")
-
-        model, scaler = train_model(stock_data, context.market_features)
-        if model is not None:
-            context.models[stock] = model
-            context.scalers[stock] = scaler
-            print(f"{stock} 模型训练成功")
-            evaluate_model(context, stock)
-        else:
-            print(f"{stock} 模型训练失败")
-
-    print("初始化完成")
-
+        # 订阅1分钟K线数据
+        subscribe(
+            symbols=['SZSE.300353','SHSE.600101','SHSE.600622'],
+            frequency='60s',
+            count=1,
+            unsubscribe_previous=True
+        )
+        
+        # 执行分析
+        for symbol in context.symbols:
+            analyze_t_patterns(context, symbol)
+            
+    except Exception as e:
+        print(f"初始化错误: {e}")
 
 if __name__ == '__main__':
     run(strategy_id='strategy_id',
         filename='main.py',
         mode=MODE_BACKTEST,
         token='{{token}}',
-        backtest_start_time='2023-01-23 08:00:00',
-        backtest_end_time='2024-01-23 16:00:00',
+        backtest_start_time='2024-06-01 09:30:00',
+        backtest_end_time='2024-11-13 15:00:00',
         backtest_adjust=ADJUST_PREV,
         backtest_initial_cash=10000000)
+
