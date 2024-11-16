@@ -5,12 +5,6 @@ def init(context,
         backtest_start_time='2024-06-01',
         backtest_end_time='2024-11-15'):
 
-    # 获取日线数据
-    daily_data = get_history_symbol(symbol=symbol, 
-                        start_date=backtest_start_time,
-                        end_date=backtest_end_time,
-                        df=True)
-    
     # 打印可用字段名，用于调试
     print("可用字段:", daily_data.columns.tolist())
     
