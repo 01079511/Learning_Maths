@@ -72,7 +72,7 @@ def analyze_t_patterns(symbol='SHSE.600622', months=5):
         data['pattern_type'] = data.apply(is_t_pattern, axis=1)
         data['is_t_pattern'] = data['pattern_type'].notna()
         
-        # 获取日线数据（移除不可用的 'turnover_ratio' 字段）
+        # 获取日线数据
         daily_data = history(symbol=symbol,
                             frequency='1d',
                             start_time=start_date,
@@ -85,14 +85,32 @@ def analyze_t_patterns(symbol='SHSE.600622', months=5):
             print("未获取到日线数据")
             return None
 
+        # 转换日期格式为字符串
+        start_date_str = start_date.strftime('%Y-%m-%d')
+        end_date_str = end_date.strftime('%Y-%m-%d')
+
+        # 获取换手率数据
+        daily_data_rate = get_history_symbol(symbol=symbol,
+                                           start_date=start_date_str,  # 使用字符串格式的日期
+                                           end_date=end_date_str,      # 使用字符串格式的日期
+                                           df=True)
+        
+        # 处理日期格式，确保可以正确匹配
+        daily_data_rate['date'] = pd.to_datetime(daily_data_rate['trade_date']).dt.date
+        
+        # 选择需要的列并进行合并
+        turn_rate_data = daily_data_rate[['date', 'turn_rate']]
+        
+        # 为daily_data添加日期列用于合并
+        daily_data['date'] = pd.to_datetime(daily_data['eob']).dt.date
+        
+        # 合并数据
+        daily_data = pd.merge(daily_data, turn_rate_data, on='date', how='left')
+
         # 计算振幅 (高-低)/昨日收盘价
         daily_data['prev_close'] = daily_data['close'].shift(1)
         daily_data['amplitude'] = (daily_data['high'] - daily_data['low']) / daily_data['prev_close']
         daily_data['amplitude'] = daily_data['amplitude'].fillna(0)
-        daily_data['date'] = pd.to_datetime(daily_data['eob']).dt.date
-
-        # 打印日线数据的列名，确认可用字段
-        # print(daily_data.columns)
 
         # 生成汇总统计
         generate_summary_csv(data, daily_data, stock_name, start_date.date(), end_date.date())
@@ -125,14 +143,15 @@ def generate_summary_csv(data, daily_data, stock_name, start_date, end_date):
         daily_stats.insert(0, '股票名称', stock_name)
         
         # 创建 daily_info 的副本
-        daily_info = daily_data[['date', 'open', 'close', 'amount', 'amplitude']].copy()
+        daily_info = daily_data[['date', 'open', 'close', 'amount', 'amplitude', 'turn_rate']].copy()
 
         # 重命名列
         daily_info.rename(columns={
-        'open': '开盘价',
-        'close': '收盘价',
-        'amount': '成交额',
-        'amplitude': '振幅'
+            'open': '开盘价',
+            'close': '收盘价',
+            'amount': '成交额',
+            'amplitude': '振幅',
+            'turn_rate': '换手率'
         }, inplace=True)
 
         # 将 daily_info 与 daily_stats 合并
@@ -150,7 +169,7 @@ def generate_summary_csv(data, daily_data, stock_name, start_date, end_date):
         print(f"生成汇总统计错误: {e}")
 
 def generate_detail_csv(data, stock_name):
-    """生成最近一天详细数据CSV"""
+    """生成最新一天详细数据CSV"""
     try:
         # 获取最新日期
         latest_date = data['date'].max()
