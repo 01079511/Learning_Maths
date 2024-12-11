@@ -2,11 +2,11 @@ import akshare as ak
 import pandas as pd
 from datetime import datetime
 
-def get_month_end_300_data():
-    """获取沪深300指数月末数据"""
+def get_month_end_stock_data(symbol_name):
+    """获取指定指数的月末数据"""
     try:
-        # 获取沪深300指数的市盈率数据
-        stock_index_pe_lg_df = ak.stock_index_pe_lg(symbol="沪深300")
+        # 获取指数的市盈率数据
+        stock_index_pe_lg_df = ak.stock_index_pe_lg(symbol=symbol_name)
         
         # 转换日期列为datetime类型
         stock_index_pe_lg_df['日期'] = pd.to_datetime(stock_index_pe_lg_df['日期'])
@@ -26,7 +26,7 @@ def get_month_end_300_data():
         return month_end_df
     
     except Exception as e:
-        print(f"获取沪深300数据时出错: {str(e)}")
+        print(f"获取{symbol_name}数据时出错: {str(e)}")
         return pd.DataFrame()
 
 def get_bond_yield_on_dates(dates):
@@ -79,11 +79,11 @@ def export_df_to_csv(df, df_name='default_name'):
     except Exception as e:
         print(f"导出CSV文件时出错: {str(e)}")
 
-def main():
-    # 1. 获取沪深300月末数据
-    stock_month_end_df = get_month_end_300_data()
+def main(symbol_name):
+    # 1. 获取指数月末数据
+    stock_month_end_df = get_month_end_stock_data(symbol_name)
     if stock_month_end_df.empty:
-        print("未获取到沪深300数据")
+        print(f"未获取到{symbol_name}数据")
         return
         
     # 2. 获取国债收益率数据
@@ -100,7 +100,8 @@ def main():
         return
         
     # 4. 导出结果
-    export_df_to_csv(merged_df, 'merged_stock_bond_data')
+    export_df_to_csv(merged_df, f'merged_{symbol_name}_bond_data')
 
 if __name__ == "__main__":
-    main()
+    symbol_name = "中证A500"  # 可以根据需要修改为其他指数
+    main(symbol_name)
