@@ -26,16 +26,16 @@ print("系统中可用的部分字体:")
 for font in list(set([f.name for f in fm.fontManager.ttflist]))[:10]:  # 只显示前10个
     print(f"- {font}")
 
-# 设置日期范围 - 获取近2年数据以匹配图片中的时间范围
+# 设置日期范围 - 获取近5年数据以匹配图片中的时间范围
 end_date = datetime.now()
-start_date = end_date - timedelta(days=730)  # 约2年数据
+start_date = end_date - timedelta(days=1825)  # 约5年数据
 start_date_str = start_date.strftime('%Y%m%d')
 end_date_str = end_date.strftime('%Y%m%d')
 
 print(f"获取从 {start_date_str} 到 {end_date_str} 的数据")
 
 # 使用测试确认的代码
-RED_LOW_VOL_CODE = "000015"  # 红利低波全收益指数代码
+RED_LOW_VOL_CODE = "000922"  # 红利低波全收益指数代码
 WIND_ALL_A_CODE = "881001"   # 万得全A指数代码
 
 try:
@@ -93,15 +93,15 @@ try:
         '40日收益差(%)': (red_low_vol_df['40d_return'] - wind_all_a_df['40d_return']) * 100  # 转为百分比
     })
     
-    # 计算收益差的252日移动平均线（约1年交易日）
-    result_df['收益差MA252(%)'] = result_df['40日收益差(%)'].rolling(window=252).mean()
+    # 计算收益差的242日移动平均线（约1年交易日）
+    result_df['收益差MA242(%)'] = result_df['40日收益差(%)'].rolling(window=242).mean()
     
     # 打印数据范围，便于调试
     print(f"数据日期范围: 从 {result_df.index.min()} 到 {result_df.index.max()}")
     
     # 显示最近的数据
     print("\n最近的收益差数据:")
-    print(result_df.tail(10)[['40日收益差(%)', '收益差MA252(%)']].round(2))
+    print(result_df.tail(10)[['40日收益差(%)', '收益差MA242(%)']].round(2))
     
     # 统计数据的基本指标，以确认数据是否合理
     print("\n收益差基本统计:")
@@ -141,7 +141,7 @@ try:
     
     # 第一个子图：收益差图表
     ax1.plot(result_df.index, result_df['40日收益差(%)'], 'r-', linewidth=1.5)
-    ax1.plot(result_df.index, result_df['收益差MA252(%)'], 'blue', linewidth=1.5)
+    ax1.plot(result_df.index, result_df['收益差MA242(%)'], 'blue', linewidth=1.5)
     ax1.axhline(y=0, color='gray', linestyle='-', linewidth=0.5)  # 添加水平零线
     ax1.grid(True, linestyle='-', linewidth=0.5, alpha=0.3)  # 更浅的网格线
     
@@ -175,9 +175,9 @@ try:
     
     # 添加图例 - 尝试使用中文，如果失败则使用英文
     try:
-        ax1.legend(['收益差', 'MA252(收益差)'], loc='upper left', ncol=2, frameon=True, framealpha=0.8, facecolor='white')
+        ax1.legend(['收益差', 'MA242(收益差)'], loc='upper left', ncol=2, frameon=True, framealpha=0.8, facecolor='white')
     except:
-        ax1.legend(['Return Diff', 'MA252'], loc='upper left', ncol=2, frameon=True, framealpha=0.8, facecolor='white')
+        ax1.legend(['Return Diff', 'MA242'], loc='upper left', ncol=2, frameon=True, framealpha=0.8, facecolor='white')
     
     # 第二个子图：指数点位走势
     # 创建左右双y轴，左侧为红利低波指数，右侧为万得全A指数
@@ -226,11 +226,11 @@ try:
     # 添加数据来源说明
     try:
         plt.figtext(0.5, 0.01, 
-                  f"数据来源：Wind，招商基金整理，截至{datetime.now().strftime('%Y年%m月%d日')}，数据追溯近2年", 
+                  f"数据来源：Wind，招商基金整理，截至{datetime.now().strftime('%Y年%m月%d日')}，数据追溯近5年", 
                   ha='center', fontsize=10)
     except:
         plt.figtext(0.5, 0.01, 
-                  f"Data Source: Wind, {datetime.now().strftime('%Y-%m-%d')}, 2-year data", 
+                  f"Data Source: Wind, {datetime.now().strftime('%Y-%m-%d')}, 5-year data", 
                   ha='center', fontsize=10)
     
     # 调整子图间距

@@ -1,142 +1,106 @@
 import akshare as ak
 import pandas as pd
 import numpy as np
-from datetime import datetime
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+from datetime import datetime, timedelta
+import matplotlib.ticker as mtick
+import matplotlib.patches as patches
+import matplotlib.font_manager as fm
+import platform
 
-# 模拟计算截至2025年5月9日的40日收益差 - 尝试中证红利指数
-print("=== 尝试使用中证红利指数与万得全A指数计算40日收益差 ===")
+# 解决中文显示问题
+system = platform.system()
+if system == 'Windows':
+    plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'Arial Unicode MS']
+elif system == 'Darwin':  # macOS
+    plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'PingFang SC', 'Heiti SC']
+else:  # Linux
+    plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'WenQuanYi Zen Hei', 'WenQuanYi Micro Hei']
+plt.rcParams['axes.unicode_minus'] = False  # 正确显示负号
 
 # 设置日期范围
-start_date = datetime(2023, 1, 1)
-end_date = datetime(2025, 5, 9)
-
+end_date = datetime.now()
+start_date = end_date - timedelta(days=1825)  # 约5年数据
 start_date_str = start_date.strftime('%Y%m%d')
 end_date_str = end_date.strftime('%Y%m%d')
 
-print(f"计算从 {start_date_str} 到 {end_date_str} 的数据")
+# 指数代码（必须使用全收益指数）
+RED_LOW_VOL_CODE = "000922"  # 中证红利全收益指数（示例代码，需根据AKShare调整）
+WIND_ALL_A_CODE = "881001"   # 万得全A指数（示例代码）
 
-# 尝试常见的红利指数代码
-red_index_codes = [
-    "000922",  # 中证红利指数
-    "H30533",  # 中证红利全收益指数 (可能需要调整)
-    "000015",  # 红利低波
-    "399324"   # 深证红利
-]
-
-# 万得全A指数代码
-WIND_ALL_A_CODE = "881001"
-
-# 测试多个指数代码
-for code in red_index_codes:
-    print(f"\n---------- 测试指数代码: {code} ----------")
+# 数据获取函数（需确认AKShare接口支持全收益指数）
+def get_index_data(index_name, index_code):
+    """获取指数日线数据（收盘价）"""
     try:
-        # 获取红利相关指数数据
-        print(f"获取指数数据 (代码: {code})...")
-        red_index_df = ak.index_zh_a_hist(symbol=code, period="daily", 
-                                         start_date=start_date_str, end_date=end_date_str)
-        
-        if red_index_df is None or red_index_df.empty:
-            print(f"指数代码 {code} 无法获取到数据，跳过...")
-            continue
-            
-        # 获取万得全A指数数据
-        print(f"获取万得全A指数数据 (代码: {WIND_ALL_A_CODE})...")
-        wind_all_a_df = ak.index_zh_a_hist(symbol=WIND_ALL_A_CODE, period="daily", 
-                                          start_date=start_date_str, end_date=end_date_str)
-        
-        # 显示获取到的数据信息
-        print(f"指数 {code}: 获取到 {len(red_index_df)} 行数据，日期范围: {red_index_df['日期'].min()} 到 {red_index_df['日期'].max()}")
-        print(f"万得全A指数: 获取到 {len(wind_all_a_df)} 行数据，日期范围: {wind_all_a_df['日期'].min()} 到 {wind_all_a_df['日期'].max()}")
-        
-        # 标准化列名
-        if '日期' in red_index_df.columns and '收盘' in red_index_df.columns:
-            red_index_df = red_index_df.rename(columns={'日期': 'date', '收盘': 'close'})
-        
-        if '日期' in wind_all_a_df.columns and '收盘' in wind_all_a_df.columns:
-            wind_all_a_df = wind_all_a_df.rename(columns={'日期': 'date', '收盘': 'close'})
-        
-        # 确保日期格式一致
-        red_index_df['date'] = pd.to_datetime(red_index_df['date'])
-        wind_all_a_df['date'] = pd.to_datetime(wind_all_a_df['date'])
-        
-        # 设置日期为索引
-        red_index_df.set_index('date', inplace=True)
-        wind_all_a_df.set_index('date', inplace=True)
-        
-        # 确保两个数据框有相同的日期范围
-        common_dates = red_index_df.index.intersection(wind_all_a_df.index)
-        red_index_df = red_index_df.loc[common_dates]
-        wind_all_a_df = wind_all_a_df.loc[common_dates]
-        
-        print(f"共有 {len(common_dates)} 个交易日的数据")
-        
-        # 尝试两种不同的40日收益计算方法
-        
-        # 方法1: 几何平均(之前使用的方法)
-        print("计算方法1: 使用几何平均计算40日收益...")
-        red_index_df['daily_return'] = red_index_df['close'].pct_change()
-        wind_all_a_df['daily_return'] = wind_all_a_df['close'].pct_change()
-        
-        red_index_df['40d_return_1'] = (1 + red_index_df['daily_return']).rolling(window=40).apply(lambda x: np.prod(x) - 1)
-        wind_all_a_df['40d_return_1'] = (1 + wind_all_a_df['daily_return']).rolling(window=40).apply(lambda x: np.prod(x) - 1)
-        
-        # 方法2: 直接计算当前价格与40天前价格的百分比变化
-        print("计算方法2: 使用价格变化百分比计算40日收益...")
-        red_index_df['40d_return_2'] = red_index_df['close'].pct_change(periods=40)
-        wind_all_a_df['40d_return_2'] = wind_all_a_df['close'].pct_change(periods=40)
-        
-        # 合并数据
-        merged_df = pd.DataFrame({
-            f'{code}指数': red_index_df['close'],
-            '万得全A指数': wind_all_a_df['close'],
-            f'{code}指数_方法1_40日收益率(%)': red_index_df['40d_return_1'] * 100,
-            '万得全A指数_方法1_40日收益率(%)': wind_all_a_df['40d_return_1'] * 100,
-            f'{code}指数_方法2_40日收益率(%)': red_index_df['40d_return_2'] * 100,
-            '万得全A指数_方法2_40日收益率(%)': wind_all_a_df['40d_return_2'] * 100
-        })
-        
-        # 计算收益差
-        merged_df['方法1_40日收益差(%)'] = (
-            merged_df[f'{code}指数_方法1_40日收益率(%)'] - merged_df['万得全A指数_方法1_40日收益率(%)']
-        )
-        merged_df['方法2_40日收益差(%)'] = (
-            merged_df[f'{code}指数_方法2_40日收益率(%)'] - merged_df['万得全A指数_方法2_40日收益率(%)']
-        )
-        
-        # 查看最后一天的数据（应该是2025年5月9日）
-        last_date = merged_df.index.max()
-        last_row = merged_df.loc[last_date]
-        
-        print("\n===== 结果验证 =====")
-        print(f"最后一个交易日: {last_date.strftime('%Y-%m-%d')}")
-        print(f"指数 {code} 收盘价: {last_row[f'{code}指数']:.2f}")
-        print(f"万得全A指数收盘价: {last_row['万得全A指数']:.2f}")
-        
-        print("\n方法1结果 (几何平均):")
-        print(f"{code}指数40日收益率: {last_row[f'{code}指数_方法1_40日收益率(%)']:.2f}%")
-        print(f"万得全A指数40日收益率: {last_row['万得全A指数_方法1_40日收益率(%)']:.2f}%")
-        print(f"40日收益差: {last_row['方法1_40日收益差(%)']:.2f}%")
-        
-        print("\n方法2结果 (价格变化百分比):")
-        print(f"{code}指数40日收益率: {last_row[f'{code}指数_方法2_40日收益率(%)']:.2f}%")
-        print(f"万得全A指数40日收益率: {last_row['万得全A指数_方法2_40日收益率(%)']:.2f}%")
-        print(f"40日收益差: {last_row['方法2_40日收益差(%)']:.2f}%")
-        
-        # 与参考图片中的数值对比
-        expected_diff = 5.22
-        method1_diff = last_row['方法1_40日收益差(%)']
-        method2_diff = last_row['方法2_40日收益差(%)']
-        
-        print(f"\n预期收益差: {expected_diff}%")
-        print(f"方法1结果: {method1_diff:.2f}% (差异: {method1_diff - expected_diff:.2f}%)")
-        print(f"方法2结果: {method2_diff:.2f}% (差异: {method2_diff - expected_diff:.2f}%)")
-        
-        if abs(method1_diff - expected_diff) < 0.5 or abs(method2_diff - expected_diff) < 0.5:
-            print("验证成功！找到接近的计算结果")
-        else:
-            print("验证失败：计算结果仍与预期值有较大差异")
-    
+        df = ak.index_zh_a_hist(symbol=index_code, period="daily", 
+                               start_date=start_date_str, end_date=end_date_str)
+        df['日期'] = pd.to_datetime(df['日期'])
+        df.set_index('日期', inplace=True)
+        df.rename(columns={'收盘': index_name}, inplace=True)
+        return df[[index_name]]
     except Exception as e:
-        print(f"处理 {code} 数据时出错: {e}")
+        print(f"获取 {index_name} 数据失败: {str(e)}")
+        return None
 
-print("\n测试完成。如果没有找到匹配的结果，可能需要查找其他指数代码或计算方法。")
+# 主程序
+try:
+    # 获取数据
+    red_low_vol_df = get_index_data("中证红利全收益", RED_LOW_VOL_CODE)
+    wind_all_a_df = get_index_data("万得全A", WIND_ALL_A_CODE)
+    
+    # 数据对齐处理
+    merged_df = pd.concat([red_low_vol_df, wind_all_a_df], axis=1)
+    merged_df = merged_df.resample('D').ffill().dropna()  # 按日填充对齐
+    
+    # 计算40日简单涨跌幅差（原文逻辑）
+    merged_df['红利40日收益'] = merged_df['中证红利全收益'].pct_change(periods=40) * 100
+    merged_df['全A40日收益'] = merged_df['万得全A'].pct_change(periods=40) * 100
+    merged_df['40日收益差(%)'] = merged_df['红利40日收益'] - merged_df['全A40日收益']
+    
+    # 计算252日均线
+    merged_df['收益差MA252(%)'] = merged_df['40日收益差(%)'].rolling(252).mean()
+    
+    # 提取最新收益差
+    latest_return_diff = merged_df['40日收益差(%)'].iloc[-1]
+    
+    # 输出关键数据（修复格式化输出）
+    print(f"\n最新40日收益差: {latest_return_diff:.2f}%")  # 格式化保留两位小数
+    print(f"数据日期范围: {merged_df.index.min()} 至 {merged_df.index.max()}")
+    
+    # 可视化配置
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 10), gridspec_kw={'height_ratios': [1, 1]}, sharex=True)
+    fig.suptitle('中证红利全收益 vs 万得全A 40日收益差', fontsize=16, y=0.95)
+    
+    # 子图1：收益差与均线
+    ax1.plot(merged_df.index, merged_df['40日收益差(%)'], 'r-', linewidth=1.5, label='40日收益差')
+    ax1.plot(merged_df.index, merged_df['收益差MA252(%)'], 'b-', linewidth=1.5, label='252日均线')
+    ax1.axhline(0, color='gray', linestyle='--', linewidth=0.8)
+    ax1.legend(loc='upper left')
+    ax1.grid(True, alpha=0.3)
+    ax1.set_ylabel('收益差 (%)')
+    
+    # 子图2：指数走势对比
+    ax2.plot(merged_df.index, merged_df['中证红利全收益'], '#008080', label='中证红利全收益')
+    ax2_right = ax2.twinx()
+    ax2_right.plot(merged_df.index, merged_df['万得全A'], '#FFA500', label='万得全A')
+    ax2.set_ylabel('中证红利指数', color='#008080')
+    ax2_right.set_ylabel('万得全A指数', color='#FFA500')
+    ax2.grid(True, alpha=0.3)
+    
+    # 格式化日期轴
+    ax2.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+    ax2.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+    fig.autofmt_xdate(rotation=0)
+    
+    # 数据来源标注
+    plt.figtext(0.5, 0.01, f"数据来源：Wind，截至{datetime.now().strftime('%Y-%m-%d')}", 
+                ha='center', fontsize=10)
+    
+    # 保存结果
+    merged_df.to_csv('红利低波vs万得全A_收益差.csv')
+    plt.savefig('红利低波vs万得全A_收益差.png', dpi=300, bbox_inches='tight')
+    plt.show()
+
+except Exception as e:
+    print("程序运行错误:", str(e))
